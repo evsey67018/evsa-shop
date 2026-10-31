@@ -1,5 +1,6 @@
-/* EVSA SHOP — доставка обращений в поддержку (ntfy.sh, без секретов в коде).
-   Только ES5 + XMLHttpRequest: работает в старых WebView (в т.ч. встроенный браузер Telegram). */
+/* EVSA SHOP — доставка обращений в поддержку.
+   Основной путь: таблица support_tickets в Supabase + мгновенное уведомление владельцу в Telegram (функция notify-ticket).
+   Запасной путь (если Supabase недоступен): ntfy.sh, как раньше. Секретов в коде нет. */
 (function () {
   var ENDPOINT = 'https://ntfy.sh/evsa-support-add6ef5ad50dc4359ba8c6f4';
   var COOLDOWN_MS = 30000, KEY = 'evsa_support_last_sent', TIMEOUT_MS = 15000;
@@ -8,8 +9,33 @@
   function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) {} }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var b = crypto.getRandomValues(new Uint8Array(16)); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128;
+    var h = ''; for (var i = 0; i < 16; i++) h += (b[i] + 256).toString(16).slice(1);
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
   window.EVSA = window.EVSA || {};
   EVSA.remoteSupport = {
+    /* запасной путь: ntfy.sh */
+    _ntfy: function (t, finish) {
+      try {
+        var x = new XMLHttpRequest();
+          x.open('POST', ENDPOINT, true);
+          x.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
+          x.timeout = TIMEOUT_MS;
+          x.onreadystatechange = function () {
+            if (x.readyState !== 4) return;
+            if (x.status >= 200 && x.status < 300) { lsSet(KEY, String(Date.now())); return finish(null, t); }
+            if (x.status === 0) return finish({ userMessage: 'Не удалось связаться с сервером поддержки. Проверьте интернет и попробуйте снова.' });
+            if (x.status === 429) return finish({ userMessage: 'Слишком много обращений. Попробуйте через минуту.' });
+            finish({ userMessage: 'Сервер поддержки ответил ошибкой (' + x.status + '). Попробуйте позже.' });
+          };
+          x.ontimeout = function () { finish({ userMessage: 'Сервер поддержки не отвечает. Попробуйте ещё раз.' }); };
+          x.onerror = function () { finish({ userMessage: 'Не удалось связаться с сервером поддержки. Проверьте интернет и попробуйте снова.' }); };
+          x.send(JSON.stringify(t));
+      } catch (e) { finish({ userMessage: 'Не удалось отправить обращение: ' + (e && e.message ? e.message : 'ошибка браузера') }); }
+    },
     MAX_TEXT: 1500,
     cooldownLeft: function () { var t = +lsGet(KEY) || 0; var left = COOLDOWN_MS - (Date.now() - t); return left > 0 && left <= COOLDOWN_MS ? left : 0; },
     /* send(data, done): done(errorOrNull, ticket). Колбэк вызывается РОВНО один раз при любом исходе. */
@@ -24,20 +50,18 @@
           localTicketId: cut(data.localTicketId, 40), sentAt: new Date().toISOString(), page: cut(location.href, 200), ua: cut(navigator.userAgent, 160) };
         if (t.text.length < 2) return finish({ userMessage: 'Напишите сообщение (минимум 2 символа)' });
         if (typeof XMLHttpRequest === 'undefined') return finish({ userMessage: 'Браузер не поддерживает отправку. Откройте сайт в Chrome или Safari.' });
-        var x = new XMLHttpRequest();
-        x.open('POST', ENDPOINT, true);
-        x.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
-        x.timeout = TIMEOUT_MS;
-        x.onreadystatechange = function () {
-          if (x.readyState !== 4) return;
-          if (x.status >= 200 && x.status < 300) { lsSet(KEY, String(Date.now())); return finish(null, t); }
-          if (x.status === 0) return finish({ userMessage: 'Не удалось связаться с сервером поддержки. Проверьте интернет и попробуйте снова.' });
-          if (x.status === 429) return finish({ userMessage: 'Слишком много обращений. Попробуйте через минуту.' });
-          finish({ userMessage: 'Сервер поддержки ответил ошибкой (' + x.status + '). Попробуйте позже.' });
-        };
-        x.ontimeout = function () { finish({ userMessage: 'Сервер поддержки не отвечает. Попробуйте ещё раз.' }); };
-        x.onerror = function () { finish({ userMessage: 'Не удалось связаться с сервером поддержки. Проверьте интернет и попробуйте снова.' }); };
-        x.send(JSON.stringify(t));
+        var self = this;
+        var sb = window.EVSA && EVSA.sb, me = EVSA.db && EVSA.db.me && EVSA.db.me();
+        if (!sb) return self._ntfy(t, finish);
+        var id = uuid(); t.ticketId = 'ES-' + id.slice(0, 8).toUpperCase();
+        var row = { id: id, user_id: me ? me.id : null, category: t.category || 'Другое', text: t.text, name: t.name || null, username: t.username.replace(/^@/, '') || null, contact: t.contact || null, page: t.page, ua: t.ua };
+        var timer = setTimeout(function () { self._ntfy(t, finish); }, TIMEOUT_MS);
+        sb.from('support_tickets').insert(row).then(function (r) {
+          clearTimeout(timer); if (called) return;
+          if (r.error) { if (/rate|too many|P0001/i.test((r.error.message || '') + r.error.code)) return finish({ userMessage: 'Слишком много обращений. Попробуйте через несколько минут.' }); return self._ntfy(t, finish); }
+          lsSet(KEY, String(Date.now())); finish(null, t);
+          sb.functions.invoke('notify-ticket', { body: { ticket_id: id } }).catch(function () {});
+        }, function () { clearTimeout(timer); self._ntfy(t, finish); });
       } catch (e) {
         lsDel(KEY);
         finish({ userMessage: 'Не удалось отправить обращение: ' + (e && e.message ? e.message : 'ошибка браузера') });

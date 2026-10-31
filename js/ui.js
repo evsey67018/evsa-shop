@@ -6,7 +6,7 @@
   U.$$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   /* Экранирование — вся пользовательская информация выводится только через esc() (защита от XSS) */
   U.esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
-  U.rub = function (n) { return Number(n || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽'; };
+  U.rub = function (n) { return Number(n || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '\u00a0₽'; };
   U.date = function (t) { return new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }); };
   U.time = function (t) { return new Date(t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); };
   U.dt = function (t) { return U.date(t) + ', ' + U.time(t); };
@@ -19,7 +19,7 @@
     cls = 'ava ' + (cls || '');
     if (!u) return '<span class="' + cls + '" style="background:#333">?</span>';
     if (u.avatar) return '<span class="' + cls + '" style="background:linear-gradient(135deg,' + (u.color || '#555') + ',#111)"><img src="' + U.esc(u.avatar) + '" alt="" onerror="this.remove()"></span>';
-    var initials = (u.name || '?').split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+    var initials = (String(u.name || '').replace(/[^0-9A-Za-zА-Яа-яЁё\s]/g, ' ').trim() || '?').split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
     return '<span class="' + cls + '" style="background:linear-gradient(135deg,' + u.color + ',#111)">' + U.esc(initials) + '</span>';
   };
   U.stars = function (r, count) { return '<span class="stars">★ ' + (r ? r.toFixed(1) : '—') + '</span>' + (count != null ? ' <span class="muted">(' + count + ')</span>' : ''); };
@@ -97,7 +97,8 @@
       '<div class="seller-mini">' + U.avatar(s, 's') + '<span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + U.esc(s ? s.name : '') + '</span>' + (EVSA.db.isOnline(s) ? '<span class="online-dot" title="Онлайн"></span>' : '') + '</div></div></article>';
   };
 
-  U.empty = function (title, sub, btn) { return '<div class="empty"><div class="big">EVSA</div><b>' + U.esc(title) + '</b><div class="small" style="margin-top:4px">' + U.esc(sub || '') + '</div>' + (btn || '') + '</div>'; };
+  var EMPTY_ICO = '<svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>';
+  U.empty = function (title, sub, btn, ico) { return '<div class="empty"><div class="empty-ico">' + (ico || EMPTY_ICO) + '</div><b>' + U.esc(title) + '</b>' + (sub ? '<div class="small">' + U.esc(sub) + '</div>' : '') + (btn ? '<div class="empty-act">' + btn.replace(/^<br>/, '') + '</div>' : '') + '</div>'; };
 
   /* toast */
   U.toast = function (text, type, link) {
@@ -118,7 +119,20 @@
   };
   if (window.visualViewport) { window.visualViewport.addEventListener('resize', U.placeToasts); window.visualViewport.addEventListener('scroll', U.placeToasts); }
   U.err = function (e) { console.warn(e); U.toast(e && e.userMessage ? e.userMessage : 'Что-то пошло не так', 'bad'); EVSA.sound.error(); };
-  U.try = function (fn) { try { return fn(); } catch (e) { if (e && e.userMessage) U.err(e); else { console.error(e); U.err(e); } return undefined; } };
+  /* U.try понимает и обычные функции, и промисы (запросы к серверу) */
+  U.try = function (fn) {
+    try { var r = fn(); if (r && typeof r.then === 'function') return r.catch(function (e) { U.err(e); }); return r; }
+    catch (e) { if (!(e && e.userMessage)) console.error(e); U.err(e); return undefined; }
+  };
+  /* кнопка в состоянии загрузки, пока идёт запрос */
+  U.busy = function (btn, promise) {
+    if (!btn) return promise; btn.disabled = true; btn.classList.add('loading');
+    var done = function () { btn.disabled = false; btn.classList.remove('loading'); };
+    return Promise.resolve(promise).then(function (x) { done(); return x; }, function (e) { done(); throw e; });
+  };
+  /* скелетоны, пока данные грузятся с сервера */
+  U.skelCards = function (n) { var h = ''; for (var i = 0; i < (n || 4); i++) h += '<div class="pcard skel-card" aria-hidden="true"><div class="pimg skel"></div><div class="pbody"><div class="skel skel-line" style="width:60%"></div><div class="skel skel-line"></div><div class="skel skel-line" style="width:40%;height:18px"></div></div></div>'; return '<div class="pgrid" aria-busy="true">' + h + '</div>'; };
+  U.skelRows = function (n) { var h = ''; for (var i = 0; i < (n || 3); i++) h += '<div class="list-row" aria-hidden="true"><span class="skel" style="width:40px;height:40px;border-radius:50%;flex:none"></span><div class="grow"><div class="skel skel-line" style="width:50%"></div><div class="skel skel-line" style="width:80%"></div></div></div>'; return '<div class="card" aria-busy="true">' + h + '</div>'; };
 
   /* modal */
   U.modal = function (title, html, opts) {

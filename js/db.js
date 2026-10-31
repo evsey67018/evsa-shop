@@ -1,448 +1,417 @@
-/* EVSA SHOP — локальное хранилище для демо-версии.
-   ВНИМАНИЕ: в демо все данные живут в localStorage этого браузера.
-   В рабочей версии те же операции выполняет сервер (/server) с PostgreSQL —
-   там баланс нельзя изменить запросом из браузера. Интерфейс функций
-   повторяет API сервера, чтобы фронтенд можно было переключить на него. */
+/* EVSA SHOP — данные в Supabase (общая база для всех пользователей).
+   Здесь только публичный anon-ключ: все права проверяются на сервере политиками RLS.
+   Оплаты и балансов нет — покупка показывает «Оплата скоро». */
 'use strict';
 (function () {
-  var KEY = 'evsa_db_v1', SKEY = 'evsa_settings';
-  var DAY = 86400000;
+  var SB_URL = 'https://duotcuunusvnxsektzkj.supabase.co';
+  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1b3RjdXVudXN2bnhzZWt0emtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NTgyODYsImV4cCI6MjEwOTAzNDI4Nn0.9VaLE7EowJDpAbzByZ2ik8ql2xsRhkCLTqg97Vp48YM';
+  var BUCKET = 'product-images';
+  var SKEY = 'evsa_settings', LKEY = 'evsa_local_v2';
+  var PROFILE_COLS = 'id,username,name,avatar_url,banned,created_at';
+  EVSA.SB_URL = SB_URL;
 
-  /* ---------- настройки ---------- */
-  var defSettings = { theme: 'dark', sound: true, notify: true, dnd: false };
+  /* ---------- настройки интерфейса (тема, звук) — локально ---------- */
+  var defSettings = { theme: 'dark', sound: true };
   EVSA.settings = {
     get: function () { try { return Object.assign({}, defSettings, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) { return Object.assign({}, defSettings); } },
-    set: function (patch) { var s = Object.assign(this.get(), patch); localStorage.setItem(SKEY, JSON.stringify(s)); return s; }
+    set: function (patch) { var s = Object.assign(this.get(), patch); try { localStorage.setItem(SKEY, JSON.stringify(s)); } catch (e) {} return s; }
   };
+  /* корзина и «Вы смотрели» — личные списки этого браузера */
+  function local() { try { return JSON.parse(localStorage.getItem(LKEY) || '{}') || {}; } catch (e) { return {}; } }
+  function saveLocal(L) { try { localStorage.setItem(LKEY, JSON.stringify(L)); } catch (e) {} }
+  try { localStorage.removeItem('evsa_db_v1'); } catch (e) {} // старая демо-база больше не используется
 
-  /* ---------- утилиты ---------- */
-  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-  function uid(p) { return (p || '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-  function now() { return Date.now(); }
-  function hashTg(str) { var h = 5381; for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0; return 100000000 + (h % 899999999); }
-  function fail(msg) { var e = new Error(msg); e.userMessage = msg; throw e; }
-  function money(n) { return Math.round(Number(n) * 100) / 100; }
+  var sb = window.supabase.createClient(SB_URL, SB_ANON, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'evsa_auth_v1' } });
+  EVSA.sb = sb;
 
-  var D = null;
-  var listeners = [];
-  function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(D)); }
-    catch (e) { fail('Хранилище браузера переполнено. Удалите старые объявления с фото или очистите демо-данные в настройках.'); }
+  /* ---------- кэш ---------- */
+  var C = { users: [], products: [], reviews: [], favs: [], chats: [], messages: [], orders: [], settings: null, tgId: null };
+  var uidMe = null, ready = false, listeners = [], sig = '';
+  function emit(force) {
+    var s = [C.products.length, C.users.length, C.reviews.length, C.favs.length, C.chats.length, C.messages.length, C.orders.length, uidMe,
+      C.chats.reduce(function (a, c) { return a + c.lastAt + (c.unread[uidMe] || 0); }, 0), C.products.reduce(function (a, p) { return a + p.status.length + p.price; }, 0)].join('|');
+    if (!force && s === sig) return; sig = s;
     listeners.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
   }
-
-  function emptyDB() {
-    return { v: 2, users: [], products: [], orders: [], transactions: [], reviews: [], chats: [], messages: [],
-      tickets: [], notifications: [], withdrawals: [], deposits: [], bans: [], warnings: [], adminLogs: [], tasks: [], cart: {}, favs: {}, viewed: {}, currentUserId: null };
+  function err(msg) { var e = new Error(msg); e.userMessage = msg; return e; }
+  function fail(msg) { throw err(msg); }
+  function dbErr(e, fallback) {
+    if (e && e.userMessage) return e;
+    var m = (e && (e.message || '')) + '';
+    if (/Failed to fetch|NetworkError|network/i.test(m)) return err('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз');
+    if (e && (e.code === '42501' || /row-level security|permission/i.test(m))) return err('Нет доступа к этому действию');
+    if (e && e.code === '23505') return err('Это уже сделано');
+    if (e && e.code === '23514') return err('Проверьте заполнение полей');
+    console.warn(e); return err(fallback || 'Что-то пошло не так. Попробуйте ещё раз');
   }
+  function q(res, fb) { if (res.error) throw dbErr(res.error, fb); return res.data; }
+  function ts(x) { return x ? Date.parse(x) : 0; }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var b = crypto.getRandomValues(new Uint8Array(16)); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128;
+    var h = Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+  function randNonce() { var a = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', b = crypto.getRandomValues(new Uint8Array(32)), s = ''; for (var i = 0; i < 32; i++) s += a[b[i] % 62]; return s; }
+  var PALETTE = ['#8b5cf6', '#22d3ee', '#ec4899', '#f59e0b', '#22c55e'];
+  function color(id) { var h = 0; for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return PALETTE[h % 5]; }
+  function upsert(list, item) { for (var i = 0; i < list.length; i++) if (list[i].id === item.id) { list[i] = item; return item; } list.push(item); return item; }
 
-  /* ---------- старт: пустой магазин (демо-товары, продавцы и отзывы удалены) ---------- */
-  function seed() { D = emptyDB(); D.v = 2; save(); }
+  function mapUser(r) {
+    return { id: r.id, name: r.name, username: r.username || '', avatar: r.avatar_url || null, color: color(r.id), createdAt: ts(r.created_at),
+      ban: r.banned ? { perm: true, reason: 'решение администрации' } : null, tgId: r.id === uidMe ? C.tgId : null };
+  }
+  function mapProduct(r) {
+    var imgs = r.images || [];
+    return { id: r.id, sellerId: r.seller_id, targetType: r.target_type, targetId: r.target_id, category: r.category, title: r.title, desc: r.description,
+      buyerMsg: r.buyer_msg || '', delivery: r.delivery, price: Number(r.price), oldPrice: Number(r.old_price) || 0, images: imgs, image: imgs[0] || null,
+      premium: false, status: r.status, sales: r.sales || 0, createdAt: ts(r.created_at) };
+  }
+  function mapChat(r) {
+    var read = {}; read[r.buyer_id] = ts(r.buyer_read_at); read[r.seller_id] = ts(r.seller_read_at);
+    return { id: r.id, a: r.buyer_id, b: r.seller_id, buyerId: r.buyer_id, sellerId: r.seller_id, productId: r.product_id, orderId: null, lastAt: ts(r.last_message_at), readAt: read, unread: {} };
+  }
+  function mapMsg(r) { return { id: r.id, chatId: r.chat_id, from: r.sender_id, text: r.text, system: false, createdAt: ts(r.created_at) }; }
+  function mapOrder(r) { return { id: r.id, productId: r.product_id, buyerId: r.buyer_id, sellerId: r.seller_id, chatId: r.chat_id, title: r.title, price: Number(r.price), status: r.status, createdAt: ts(r.created_at), completedAt: ts(r.completed_at) }; }
+  function mapReview(r) { return { id: r.id, orderId: r.order_id, productId: r.product_id, sellerId: r.seller_id, buyerId: r.buyer_id, rating: r.rating, text: r.text, createdAt: ts(r.created_at) }; }
 
-  /* Одноразовая чистка браузеров, где остались старые демо-данные (версия базы 1) */
-  function purgeDemo() {
-    var bad = {}, gone = {};
-    D.users.forEach(function (u) { if (u.isSeed) bad[u.id] = 1; });
-    D.products.forEach(function (p) { if (bad[p.sellerId]) gone[p.id] = 1; });
-    D.orders.forEach(function (o) {
-      if (!bad[o.sellerId] && !gone[o.productId]) return;
-      var b = D.users.find(function (u) { return u.id === o.buyerId; });
-      if (b && !bad[b.id] && (o.status === 'reserved' || o.status === 'delivered' || o.status === 'dispute')) {
-        b.reserved = money(Math.max(0, (b.reserved || 0) - o.price)); b.balance = money((b.balance || 0) + o.price);
-        D.transactions.push({ id: uid('t'), userId: b.id, type: 'refund', amount: money(o.price), note: 'Возврат: тестовый товар «' + o.title + '» удалён', ref: o.id, createdAt: now() });
-      }
+  function computeUnread() {
+    C.chats.forEach(function (c) {
+      c.unread = {};
+      if (!uidMe) return;
+      var since = c.readAt[uidMe] || 0;
+      c.unread[uidMe] = C.messages.filter(function (m) { return m.chatId === c.id && m.from !== uidMe && m.createdAt > since; }).length;
+      var o = C.orders.find(function (x) { return x.chatId === c.id; }); c.orderId = o ? o.id : null;
     });
-    var badChat = {};
-    D.chats.forEach(function (c) { if (bad[c.a] || bad[c.b] || gone[c.productId]) badChat[c.id] = 1; });
-    D.users = D.users.filter(function (u) { return !bad[u.id]; });
-    D.products = D.products.filter(function (p) { return !gone[p.id]; });
-    D.orders = D.orders.filter(function (o) { return !bad[o.sellerId] && !gone[o.productId]; });
-    D.reviews = D.reviews.filter(function (r) { return r.orderId !== 'seed' && !bad[r.sellerId] && !bad[r.buyerId]; });
-    D.chats = D.chats.filter(function (c) { return !badChat[c.id]; });
-    D.messages = D.messages.filter(function (m) { return !badChat[m.chatId]; });
-    D.notifications = D.notifications.filter(function (n) { var m = /#\/chat\/([^/?#]+)/.exec(n.link || ''); return !(m && badChat[m[1]]); });
-    D.tasks = [];
-    ['cart', 'favs', 'viewed'].forEach(function (k) { Object.keys(D[k] || {}).forEach(function (uidk) { if (Array.isArray(D[k][uidk])) D[k][uidk] = D[k][uidk].filter(function (id) { return !gone[id]; }); }); });
-    if (D.currentUserId && bad[D.currentUserId]) D.currentUserId = null;
-    D.v = 2;
-    try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) {}
   }
 
-  function load() {
-    try { D = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { D = null; }
-    if (!D || (D.v !== 1 && D.v !== 2)) seed();
-    Object.keys(emptyDB()).forEach(function (k) { if (D[k] === undefined) D[k] = emptyDB()[k]; });
-    if (D.v === 1) purgeDemo();
+  /* ---------- загрузка ---------- */
+  function loadPublic() {
+    return Promise.all([
+      sb.from('products').select('*').order('created_at', { ascending: false }).limit(2000),
+      sb.from('profiles').select(PROFILE_COLS).limit(5000),
+      sb.from('reviews').select('*').order('created_at', { ascending: false }).limit(5000)
+    ]).then(function (rs) {
+      var ps = q(rs[0]), us = q(rs[1]), rv = q(rs[2]);
+      C.products = ps.map(mapProduct); C.users = us.map(mapUser); C.reviews = rv.map(mapReview);
+    });
+  }
+  function clearPrivate() { C.favs = []; C.chats = []; C.messages = []; C.orders = []; C.settings = null; C.tgId = null; }
+  function loadPrivate() {
+    if (!uidMe) { clearPrivate(); return Promise.resolve(); }
+    var me = uidMe;
+    return Promise.all([
+      sb.from('favorites').select('product_id'),
+      sb.from('chats').select('*').order('last_message_at', { ascending: false }).limit(500),
+      sb.from('messages').select('*').order('created_at', { ascending: true }).limit(5000),
+      sb.from('orders').select('*').order('created_at', { ascending: false }).limit(500),
+      sb.from('user_settings').select('*').maybeSingle(),
+      sb.rpc('my_telegram_id')
+    ]).then(function (rs) {
+      if (me !== uidMe) return;
+      C.favs = q(rs[0]).map(function (r) { return r.product_id; });
+      C.chats = q(rs[1]).map(mapChat); C.messages = q(rs[2]).map(mapMsg); C.orders = q(rs[3]).map(mapOrder);
+      C.settings = rs[4].data || null; C.tgId = rs[5].data || null;
+      C.users.forEach(function (u) { if (u.id === uidMe) u.tgId = C.tgId; });
+      computeUnread();
+    });
+  }
+  /* лёгкое обновление чатов (на случай, если realtime недоступен) */
+  function refreshChats() {
+    if (!uidMe) return Promise.resolve();
+    return Promise.all([sb.from('chats').select('*').limit(500), sb.from('messages').select('*').order('created_at', { ascending: true }).limit(5000)]).then(function (rs) {
+      if (rs[0].error || rs[1].error) return;
+      C.chats = rs[0].data.map(mapChat); C.messages = rs[1].data.map(mapMsg); computeUnread(); emit();
+    });
+  }
+  function ensureUsers(ids) {
+    var miss = ids.filter(function (id) { return id && !C.users.some(function (u) { return u.id === id; }); });
+    if (!miss.length) return Promise.resolve();
+    return sb.from('profiles').select(PROFILE_COLS).in('id', miss).then(function (r) { (r.data || []).forEach(function (x) { upsert(C.users, mapUser(x)); }); });
   }
 
-  /* ---------- доступ ---------- */
-  function user(id) { return D.users.find(function (u) { return u.id === id; }) || null; }
-  function me() { return D.currentUserId ? user(D.currentUserId) : null; }
-  function isBanned(u) { if (!u || !u.ban) return false; if (u.ban.perm) return true; if (u.ban.until > now()) return true; return false; }
+  /* ---------- realtime ---------- */
+  var chan = null;
+  function subscribe() {
+    if (chan) { try { sb.removeChannel(chan); } catch (e) {} chan = null; }
+    if (!uidMe) return;
+    chan = sb.channel('evsa-' + uidMe)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, function (p) {
+        var m = mapMsg(p.new); upsert(C.messages, m);
+        if (!C.chats.some(function (c) { return c.id === m.chatId; })) return refreshChats();
+        var c = C.chats.find(function (x) { return x.id === m.chatId; }); if (c) c.lastAt = Math.max(c.lastAt, m.createdAt);
+        computeUnread(); ensureUsers([m.from]).then(function () { emit(); });
+        if (m.from !== uidMe && EVSA.sound && EVSA.sound.message) try { EVSA.sound.message(); } catch (e) {}
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, function (p) {
+        if (!p.new || !p.new.id) return; upsert(C.chats, mapChat(p.new)); computeUnread();
+        ensureUsers([p.new.buyer_id, p.new.seller_id]).then(function () { emit(); });
+      })
+      .subscribe();
+  }
+
+  function setUser(id) {
+    if (id === uidMe) return Promise.resolve();
+    uidMe = id; clearPrivate();
+    return ensureUsers(id ? [id] : []).then(loadPrivate).then(function () { subscribe(); emit(true); });
+  }
+  sb.auth.onAuthStateChange(function (ev, session) {
+    var id = session && session.user ? session.user.id : null;
+    if (ready) setTimeout(function () { setUser(id); }, 0);
+  });
+
+  /* ---------- проверки ---------- */
+  function user(id) { if (!id) return null; return C.users.find(function (u) { return u.id === id; }) || { id: id, name: 'Пользователь', username: '', avatar: null, color: color(id), createdAt: 0, ban: null, missing: true }; }
+  function me() { if (!uidMe) return null; var u = C.users.find(function (x) { return x.id === uidMe; }); return u || null; }
+  function isBanned(u) { return !!(u && u.ban); }
   function requireMe() { var u = me(); if (!u) fail('Сначала войдите через Telegram'); return u; }
-  function requireActive() { var u = requireMe(); if (isBanned(u)) fail(u.ban.perm ? 'Ваш аккаунт заблокирован навсегда' : 'Ваш аккаунт заблокирован до ' + new Date(u.ban.until).toLocaleString('ru-RU')); return u; }
-  function requireAdmin() { fail('Доступ только для администратора'); }
+  function requireActive() { var u = requireMe(); if (isBanned(u)) fail('Ваш аккаунт заблокирован'); return u; }
   function disc(p) { return p.oldPrice > p.price ? (p.oldPrice - p.price) / p.oldPrice : 0; }
-  /* «онлайн»: текущий пользователь и часть демо-продавцов (детерминированно по часу) */
-  function isOnline(u) { if (!u) return false; if (u.id === D.currentUserId) return true; return false; }
+  function isOnline(u) { return !!(u && u.id === uidMe); }
   function sellerStats(id) {
-    var rv = D.reviews.filter(function (r) { return r.sellerId === id; });
+    var rv = C.reviews.filter(function (r) { return r.sellerId === id; });
     var avg = rv.length ? rv.reduce(function (s, r) { return s + r.rating; }, 0) / rv.length : 0;
-    return { rating: Math.round(avg * 10) / 10, count: rv.length, sales: D.orders.filter(function (o) { return o.sellerId === id && o.status === 'completed'; }).length };
+    var sales = C.products.filter(function (p) { return p.sellerId === id; }).reduce(function (s, p) { return s + (p.sales || 0); }, 0);
+    return { rating: Math.round(avg * 10) / 10, count: rv.length, sales: sales };
   }
-
-  /* ---------- журнал ---------- */
-  function tx(userId, type, amount, note, ref) { D.transactions.push({ id: uid('t'), userId: userId, type: type, amount: money(amount), note: note || '', ref: ref || null, createdAt: now() }); }
-  function notify(userId, text, link, kind) {
-    var n = { id: uid('n'), userId: userId, text: text, link: link || '', kind: kind || 'info', read: false, createdAt: now() };
-    D.notifications.push(n);
-    if (userId === D.currentUserId && EVSA.onNotify) setTimeout(function () { EVSA.onNotify(n); }, 0);
-    return n;
-  }
-  function adminLog(action, targetId, details) { D.adminLogs.push({ id: uid('al'), action: action, targetId: targetId, details: details || '', createdAt: now() }); }
-  function schedule(ms, type, payload) { D.tasks.push({ id: uid('k'), due: now() + ms, type: type, payload: payload }); }
-
-  /* ---------- защита от повторных запросов ---------- */
+  function product(id) { return C.products.find(function (p) { return p.id === id; }) || null; }
+  function chat(id) { var c = C.chats.find(function (x) { return x.id === id; }); if (!c || !uidMe || (c.a !== uidMe && c.b !== uidMe)) return null; return c; }
+  function P(fn) { return new Promise(function (res) { res(fn()); }); }
   var inflight = {};
-  function once(key, fn) {
-    if (inflight[key]) fail('Операция уже выполняется, подождите…');
-    inflight[key] = true;
-    try { return fn(); } finally { setTimeout(function () { delete inflight[key]; }, 800); }
+  function once(key, fn) { if (inflight[key]) return Promise.reject(err('Операция уже выполняется, подождите…')); inflight[key] = 1; return P(fn).finally(function () { delete inflight[key]; }); }
+
+  function dataUrlToBlob(u) { return fetch(u).then(function (r) { return r.blob(); }); }
+  function uploadImage(dataUrl, prefix) {
+    var path = uidMe + '/' + (prefix || '') + uuid() + '.jpg';
+    return dataUrlToBlob(dataUrl).then(function (blob) {
+      if (blob.size > 2 * 1024 * 1024) throw err('Фото слишком большое после сжатия (макс. 2 МБ)');
+      return sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: false });
+    }).then(function (r) { if (r.error) throw dbErr(r.error, 'Не удалось загрузить фото'); return SB_URL + '/storage/v1/object/public/' + BUCKET + '/' + path; });
   }
 
-  /* ---------- чаты ---------- */
-  function getOrCreateChat(aId, bId, productId) {
-    var c = D.chats.find(function (c) { return c.productId === productId && ((c.a === aId && c.b === bId) || (c.a === bId && c.b === aId)); });
-    if (!c) { c = { id: uid('c'), a: aId, b: bId, productId: productId, orderId: null, lastAt: now(), unread: {} }; D.chats.push(c); }
-    return c;
-  }
-  function pushMsg(chatId, from, text, sys) {
-    var c = D.chats.find(function (x) { return x.id === chatId; });
-    var m = { id: uid('m'), chatId: chatId, from: from, text: String(text).slice(0, 2000), system: !!sys, createdAt: now() };
-    D.messages.push(m); c.lastAt = m.createdAt;
-    [c.a, c.b].forEach(function (u) { if (u !== from) c.unread[u] = (c.unread[u] || 0) + 1; });
-    return m;
-  }
-
-  /* ---------- фоновые задачи (сейчас нет; демо-боты удалены) ---------- */
-  function runTasks() {
-    if (!D || !D.tasks.length) return;
-    var n = D.tasks.length; D.tasks = D.tasks.filter(function (t) { return t.due > now(); });
-    if (D.tasks.length !== n) save();
+  /* ---------- вход через Telegram-бота ---------- */
+  var NKEY = 'evsa_login_nonce';
+  function invoke(name, body) {
+    return sb.functions.invoke(name, { body: body }).then(function (r) {
+      if (r.error) throw dbErr(r.error, 'Сервер не ответил. Попробуйте ещё раз');
+      return r.data || {};
+    });
   }
 
   /* =========================================================
-     ПУБЛИЧНОЕ API (повторяет серверные эндпоинты /api/*)
+     ПУБЛИЧНОЕ API
      ========================================================= */
   EVSA.db = {
-    init: function () { load(); setInterval(runTasks, 1000); runTasks(); },
+    init: function () {
+      return sb.auth.getSession().then(function (r) {
+        uidMe = r.data && r.data.session ? r.data.session.user.id : null;
+        return loadPublic().then(loadPrivate);
+      }).catch(function (e) { console.error(e); EVSA.db.loadFailed = true; })
+        .then(function () {
+          ready = true; subscribe(); emit(true);
+          setInterval(function () { if (!document.hidden) refreshChats(); }, 15000);
+          setInterval(function () { if (!document.hidden) loadPublic().then(function () { if (uidMe) C.users.forEach(function (u) { if (u.id === uidMe) u.tgId = C.tgId; }); emit(); }).catch(function () {}); }, 60000);
+        });
+    },
+    ready: function () { return ready; },
+    /* есть сохранённая сессия — пока данные грузятся, показываем скелетон, а не «Войдите» */
+    maybeAuthed: function () { try { return !!localStorage.getItem('evsa_auth_v1'); } catch (e) { return false; } },
+    reload: function () { return loadPublic().then(loadPrivate).then(function () { emit(true); }); },
     onChange: function (f) { listeners.push(f); },
-    raw: function () { return D; },
-    reset: function () { localStorage.removeItem(KEY); seed(); },
+    raw: function () { return C; },
     me: me, user: user, isBanned: isBanned, sellerStats: sellerStats, isOnline: isOnline,
 
-    /* --- авторизация (демо). В рабочей версии: Telegram Login Widget + проверка hash на сервере --- */
-    login: function (data) {
-      var name = String(data.name || '').trim().slice(0, 40), username = String(data.username || '').trim().replace(/^@/, '').slice(0, 32);
-      if (name.length < 2) fail('Введите имя (минимум 2 символа)');
-      if (username && !/^[A-Za-z0-9_]{3,32}$/.test(username)) fail('Username: латиница, цифры и _, от 3 символов');
-      var tgId = hashTg((username || name).toLowerCase());
-      var u = D.users.find(function (x) { return x.tgId === tgId; }); // один Telegram ID = один аккаунт
-      if (u) { u.name = name; u.username = username; if (data.avatar) u.avatar = data.avatar; u.lastSync = now(); }
-      else {
-        u = { id: uid('u'), tgId: tgId, name: name, username: username, avatar: data.avatar || null, color: ['#8b5cf6', '#22d3ee', '#ec4899', '#f59e0b', '#22c55e'][tgId % 5],
-          balance: 0, reserved: 0, warnings: 0, ban: null, createdAt: now(), lastSync: now() };
-        D.users.push(u);
-        notify(u.id, 'Добро пожаловать в EVSA SHOP, ' + name + '!', '#/', 'info');
-      }
-      D.currentUserId = u.id; save(); return u;
+    /* --- вход: сайт регистрирует nonce, пользователь жмёт Start в боте, сайт забирает сессию --- */
+    loginStart: function () {
+      var n = randNonce();
+      return invoke('tg-login', { action: 'start', nonce: n }).then(function () {
+        try { sessionStorage.setItem(NKEY, JSON.stringify({ n: n, at: Date.now() })); } catch (e) {}
+        return { nonce: n, url: 'https://t.me/' + EVSA.TOPUP.BOT + '?start=login_' + n };
+      });
     },
-    loginAs: function (id) { var u = user(id); if (!u) fail('Пользователь не найден'); D.currentUserId = id; save(); return u; },
-    logout: function () { D.currentUserId = null; save(); },
-    updateAvatar: function (dataUrl) { var u = requireMe(); u.avatar = dataUrl; u.lastSync = now(); save(); },
+    pendingLogin: function () { try { var x = JSON.parse(sessionStorage.getItem(NKEY) || 'null'); return x && Date.now() - x.at < 5 * 60000 ? x.n : null; } catch (e) { return null; } },
+    loginPoll: function (n) {
+      return invoke('tg-login', { action: 'poll', nonce: n }).then(function (d) {
+        if (d.status !== 'ok') { if (d.status !== 'pending') try { sessionStorage.removeItem(NKEY); } catch (e) {} return d.status || 'error'; }
+        try { sessionStorage.removeItem(NKEY); } catch (e) {}
+        return sb.auth.setSession({ access_token: d.session.access_token, refresh_token: d.session.refresh_token }).then(function (r) {
+          if (r.error || !r.data.session) throw dbErr(r.error, 'Не удалось войти');
+          return loadPublic().then(function () { return setUser(r.data.session.user.id); }).then(function () { return 'ok'; });
+        });
+      });
+    },
+    logout: function () { return sb.auth.signOut().catch(function () {}).then(function () { return setUser(null); }); },
+    updateAvatar: function (dataUrl) {
+      return once('ava', function () {
+        requireActive();
+        return uploadImage(dataUrl, 'avatar-').then(function (url) { return sb.from('profiles').update({ avatar_url: url }).eq('id', uidMe).select(PROFILE_COLS).single(); })
+          .then(function (r) { upsert(C.users, mapUser(q(r))); emit(true); });
+      });
+    },
+    notifyOn: function () { return C.settings ? C.settings.notify_messages !== false : true; },
+    setNotify: function (on) {
+      requireMe();
+      var prev = C.settings; C.settings = Object.assign({}, C.settings || {}, { notify_messages: !!on });
+      return sb.from('user_settings').update({ notify_messages: !!on, updated_at: new Date().toISOString() }).eq('user_id', uidMe).select().then(function (r) {
+        if (r.error) throw r.error;
+        if (!r.data.length) return sb.from('user_settings').insert({ user_id: uidMe, notify_messages: !!on }).then(function (x) { if (x.error) throw x.error; });
+      }).catch(function (e) { C.settings = prev; throw dbErr(e, 'Не удалось сохранить настройку'); });
+    },
 
     /* --- каталог --- */
-    products: function (q) {
-      q = q || {};
-      var list = D.products.filter(function (p) {
+    products: function (f) {
+      f = f || {};
+      var list = C.products.filter(function (p) {
         if (p.status !== 'active') return false;
-        if (q.targetType && p.targetType !== q.targetType) return false;
-        if (q.targetId && p.targetId !== q.targetId) return false;
-        if (q.category && p.category !== q.category) return false;
-        if (q.sellerId && p.sellerId !== q.sellerId) return false;
-        var s = user(p.sellerId); if (isBanned(s)) return false;
-        if (q.delivery && p.delivery !== q.delivery) return false;
-        if (q.minPrice && p.price < Number(q.minPrice)) return false;
-        if (q.maxPrice && p.price > Number(q.maxPrice)) return false;
-        if (q.discountOnly && !(p.oldPrice > p.price)) return false;
-        if (q.online && !isOnline(s)) return false;
-        if (q.withReviews && !sellerStats(p.sellerId).count) return false;
-        if (q.search) { var needle = q.search.toLowerCase(); if (p.title.toLowerCase().indexOf(needle) < 0) return false; }
+        if (f.targetType && p.targetType !== f.targetType) return false;
+        if (f.targetId && p.targetId !== f.targetId) return false;
+        if (f.category && p.category !== f.category) return false;
+        if (f.sellerId && p.sellerId !== f.sellerId) return false;
+        if (isBanned(user(p.sellerId))) return false;
+        if (f.delivery && p.delivery !== f.delivery) return false;
+        if (f.minPrice && p.price < Number(f.minPrice)) return false;
+        if (f.maxPrice && p.price > Number(f.maxPrice)) return false;
+        if (f.discountOnly && !(p.oldPrice > p.price)) return false;
+        if (f.online && !isOnline(user(p.sellerId))) return false;
+        if (f.withReviews && !sellerStats(p.sellerId).count) return false;
+        if (f.search) { var n = f.search.toLowerCase(); if (p.title.toLowerCase().indexOf(n) < 0 && (p.desc || '').toLowerCase().indexOf(n) < 0) return false; }
         return true;
       });
-      var sort = q.sort || 'popular';
       var cmp = {
         cheap: function (a, b) { return a.price - b.price; },
         expensive: function (a, b) { return b.price - a.price; },
-        popular: function (a, b) { return b.sales - a.sales; },
+        popular: function (a, b) { return (b.sales - a.sales) || (b.createdAt - a.createdAt); },
         new: function (a, b) { return b.createdAt - a.createdAt; },
         discount: function (a, b) { return disc(b) - disc(a); },
         rating: function (a, b) { return sellerStats(b.sellerId).rating - sellerStats(a.sellerId).rating || sellerStats(b.sellerId).count - sellerStats(a.sellerId).count; }
-      }[sort] || function () { return 0; };
-      return list.sort(function (a, b) { return (b.premium - a.premium) || cmp(a, b); }); // Premium всегда выше
+      }[f.sort || 'popular'] || function () { return 0; };
+      return list.sort(cmp);
     },
-    product: function (id) { return D.products.find(function (p) { return p.id === id; }) || null; },
-    countFor: function (type, id, cat) { return D.products.filter(function (p) { return p.status === 'active' && p.targetType === type && p.targetId === id && (!cat || p.category === cat); }).length; },
+    product: product,
+    countFor: function (type, id, cat) { return C.products.filter(function (p) { return p.status === 'active' && p.targetType === type && p.targetId === id && (!cat || p.category === cat) && !isBanned(user(p.sellerId)); }).length; },
 
-    createProduct: function (f, premium) {
+    /* f: {targetType,targetId,category,title,desc,buyerMsg,price,oldPrice,image,delivery} */
+    createProduct: function (f) {
       return once('create', function () {
-        var u = requireActive();
+        requireActive();
         if (!EVSA.findTarget(f.targetType, f.targetId)) fail('Выберите игру или сайт');
         if (!EVSA.CATEGORIES.some(function (c) { return c.id === f.category; })) fail('Выберите категорию');
         var title = String(f.title || '').trim(), desc = String(f.desc || '').trim();
         if (title.length < 4 || title.length > 80) fail('Название: от 4 до 80 символов');
         if (desc.length < 10 || desc.length > 2000) fail('Описание: от 10 до 2000 символов');
-        var old = Number(f.oldPrice), sale = f.salePrice === '' || f.salePrice == null ? 0 : Number(f.salePrice);
-        if (!isFinite(old) || old < 10 || old > 1000000) fail('Цена без скидки: от 10 до 1 000 000 ₽');
-        if (sale && (!isFinite(sale) || sale < 1 || sale >= old)) fail('Цена со скидкой должна быть меньше обычной цены');
+        var price = Math.round(Number(f.price) * 100) / 100, old = f.oldPrice === '' || f.oldPrice == null ? 0 : Math.round(Number(f.oldPrice) * 100) / 100;
+        if (!isFinite(price) || price < 1 || price > 1000000) fail('Цена: от 1 до 1 000 000 ₽');
+        if (!isFinite(old) || old < 0) fail('Цена без скидки указана неверно');
+        if (old && old <= price) old = 0; // скидка только если старая цена больше
+        if (old > 1000000) fail('Цена без скидки: до 1 000 000 ₽');
         if (!f.image || !/^data:image\/(jpeg|png|webp);base64,/.test(f.image)) fail('Загрузите фотографию товара');
-        if (premium) {
-          if (u.balance < EVSA.PREMIUM_PRICE) fail('Недостаточно средств для Premium (нужно ' + EVSA.PREMIUM_PRICE + ' ₽)');
-          u.balance = money(u.balance - EVSA.PREMIUM_PRICE);
-          tx(u.id, 'premium', -EVSA.PREMIUM_PRICE, 'Premium-размещение «' + title + '»');
-        }
-        var p = { id: uid('p'), sellerId: u.id, targetType: f.targetType, targetId: f.targetId, category: f.category, title: title, desc: desc,
-          buyerMsg: String(f.buyerMsg || '').trim().slice(0, 1000), delivery: EVSA.DELIVERY.indexOf(f.delivery) >= 0 ? f.delivery : EVSA.DELIVERY_BY_CAT[f.category], price: sale || old, oldPrice: sale ? old : 0, image: f.image,
-          premium: !!premium, status: 'active', sales: 0, createdAt: now() };
-        D.products.push(p); save(); return p;
+        var id = uuid();
+        return uploadImage(f.image).then(function (url) {
+          return sb.from('products').insert({ id: id, seller_id: uidMe, target_type: f.targetType, target_id: f.targetId, category: f.category, title: title, description: desc,
+            buyer_msg: String(f.buyerMsg || '').trim().slice(0, 1000), price: price, old_price: old, images: [url],
+            delivery: EVSA.DELIVERY.indexOf(f.delivery) >= 0 ? f.delivery : EVSA.DELIVERY_BY_CAT[f.category] }).select().single();
+        }).then(function (r) { var p = upsert(C.products, mapProduct(q(r, 'Не удалось выставить товар'))); emit(true); return p; });
       });
     },
-    deleteProduct: function (id) { var u = requireMe(); var p = this.product(id); if (!p || p.sellerId !== u.id) fail('Нет доступа'); p.status = 'removed'; save(); },
+    deleteProduct: function (id) {
+      var p = product(id); if (!p || p.sellerId !== uidMe) return Promise.reject(err('Нет доступа'));
+      return sb.from('products').update({ status: 'removed' }).eq('id', id).select().single().then(function (r) { upsert(C.products, mapProduct(q(r))); emit(true); });
+    },
 
-    /* --- покупки и безопасная сделка --- */
-    buy: function (productId) {
-      return once('buy:' + productId, function () {
-        var u = requireActive(); var p = EVSA.db.product(productId);
-        if (!p || p.status !== 'active') fail('Товар уже недоступен');
-        if (p.sellerId === u.id) fail('Нельзя купить свой товар');
-        var seller = user(p.sellerId); if (isBanned(seller)) fail('Продавец заблокирован');
-        if (u.balance < p.price) fail('Недостаточно средств. Не хватает ' + money(p.price - u.balance) + ' ₽');
-        u.balance = money(u.balance - p.price); u.reserved = money(u.reserved + p.price);
-        var chat = getOrCreateChat(u.id, p.sellerId, p.id);
-        var o = { id: uid('o'), productId: p.id, buyerId: u.id, sellerId: p.sellerId, price: p.price, title: p.title, status: 'reserved', chatId: chat.id, reviewed: false, createdAt: now() };
-        D.orders.push(o); chat.orderId = o.id;
-        tx(u.id, 'purchase', -p.price, 'Покупка «' + p.title + '» (в резерве)', o.id);
-        p.sales++;
-        if (p.category === 'accounts') p.status = 'sold';
-        pushMsg(chat.id, 'system', 'Сделка открыта. ' + p.price + ' ₽ зарезервированы и перейдут продавцу только после подтверждения получения.', true);
-        notify(p.sellerId, 'Новая покупка: «' + p.title + '» за ' + p.price + ' ₽', '#/chat/' + chat.id, 'deal');
-        notify(u.id, 'Вы купили «' + p.title + '». Деньги в резерве до подтверждения.', '#/chat/' + chat.id, 'deal');
-        save(); return o;
-      });
-    },
-    order: function (id) { return D.orders.find(function (o) { return o.id === id; }) || null; },
-    markDelivered: function (orderId) {
-      var u = requireActive(); var o = this.order(orderId);
-      if (!o || o.sellerId !== u.id) fail('Нет доступа к сделке');
-      if (o.status !== 'reserved') fail('Сделка уже в другом статусе');
-      o.status = 'delivered'; o.deliveredAt = now();
-      pushMsg(o.chatId, 'system', 'Продавец отметил товар как переданный. Покупатель, проверьте товар.', true);
-      notify(o.buyerId, 'Продавец передал товар «' + o.title + '»', '#/chat/' + o.chatId, 'deal'); save();
-    },
-    confirm: function (orderId) {
-      return once('confirm:' + orderId, function () {
-        var u = requireActive(); var o = EVSA.db.order(orderId);
-        if (!o || o.buyerId !== u.id) fail('Подтвердить может только покупатель');
-        if (o.status !== 'reserved' && o.status !== 'delivered') fail('Сделка уже ' + (o.status === 'completed' ? 'завершена' : 'в споре'));
-        var s = user(o.sellerId);
-        u.reserved = money(u.reserved - o.price); s.balance = money(s.balance + o.price);
-        o.status = 'completed'; o.completedAt = now();
-        tx(s.id, 'sale', o.price, 'Продажа «' + o.title + '»', o.id);
-        pushMsg(o.chatId, 'system', 'Покупатель подтвердил получение. Сделка завершена, ' + o.price + ' ₽ переведены продавцу.', true);
-        notify(s.id, 'Сделка завершена: +' + o.price + ' ₽ за «' + o.title + '»', '#/chat/' + o.chatId, 'deal');
-        save(); return o;
-      });
-    },
-    applyItem: function (orderId, gameId) {
-      var u = requireActive(); var o = this.order(orderId);
-      if (!o || o.buyerId !== u.id) fail('Нет доступа');
-      if (o.status === 'completed' || o.status === 'refunded') fail('Сделка уже закрыта');
-      var id = String(gameId || '').trim(); if (id.length < 2) fail('Укажите игровой ID / ник');
-      pushMsg(o.chatId, u.id, '🎮 Прошу применить товар к аккаунту: ' + id.slice(0, 64));
-      notify(o.sellerId, 'Покупатель запросил применение товара «' + o.title + '»', '#/chat/' + o.chatId, 'deal'); save();
-    },
-    dispute: function (orderId, text) {
-      var u = requireActive(); var o = this.order(orderId);
-      if (!o || (o.buyerId !== u.id && o.sellerId !== u.id)) fail('Нет доступа');
-      if (o.status === 'completed' || o.status === 'refunded') fail('Сделка уже закрыта');
-      if (o.status === 'dispute') fail('Спор уже открыт');
-      o.status = 'dispute';
-      EVSA.db.sendSupport('Проблема с покупкой', 'Спор по сделке #' + o.id.slice(-6) + ' «' + o.title + '»: ' + (text || 'без комментария'), o.id);
-      pushMsg(o.chatId, 'system', 'Открыт спор. Деньги остаются в резерве до решения поддержки.', true);
-      notify(o.sellerId, 'По сделке «' + o.title + '» открыт спор', '#/chat/' + o.chatId, 'deal'); save();
-    },
+    /* --- покупки: оплата пока отключена --- */
+    PAYMENTS: false,
+    buy: function () { return Promise.reject(err('Оплата скоро. Пока напишите продавцу в чат')); },
+    order: function (id) { return C.orders.find(function (o) { return o.id === id; }) || null; },
+    ordersOf: function (u, role) { return C.orders.filter(function (o) { return role === 'sell' ? o.sellerId === u : o.buyerId === u; }).map(function (o) { o.reviewed = C.reviews.some(function (r) { return r.orderId === o.id; }); return o; }); },
     review: function (orderId, rating, text) {
-      var u = requireActive(); var o = this.order(orderId);
-      if (!o || o.buyerId !== u.id) fail('Отзыв может оставить только покупатель');
-      if (o.status !== 'completed') fail('Отзыв доступен после завершения сделки');
-      if (o.reviewed || D.reviews.some(function (r) { return r.orderId === o.id; })) fail('Отзыв за эту покупку уже оставлен');
-      rating = Number(rating); if (!(rating >= 1 && rating <= 5)) fail('Поставьте оценку от 1 до 5');
-      text = String(text || '').trim(); if (text.length < 3) fail('Напишите пару слов');
-      D.reviews.push({ id: uid('rv'), orderId: o.id, productId: o.productId, sellerId: o.sellerId, buyerId: u.id, rating: rating, text: text.slice(0, 1000), createdAt: now() });
-      o.reviewed = true; notify(o.sellerId, 'Новый отзыв ' + '★'.repeat(rating) + ' от ' + u.name, '#/u/' + o.sellerId, 'info'); save();
+      return once('review', function () {
+        var u = requireActive(), o = EVSA.db.order(orderId);
+        if (!o || o.buyerId !== u.id) fail('Отзыв может оставить только покупатель');
+        if (o.status !== 'completed') fail('Отзыв доступен после завершения сделки');
+        if (C.reviews.some(function (r) { return r.orderId === o.id; })) fail('Отзыв за эту покупку уже оставлен');
+        rating = Number(rating); if (!(rating >= 1 && rating <= 5)) fail('Поставьте оценку от 1 до 5');
+        text = String(text || '').trim(); if (text.length < 3) fail('Напишите пару слов (минимум 3 символа)');
+        return sb.from('reviews').insert({ order_id: o.id, product_id: o.productId, seller_id: o.sellerId, buyer_id: u.id, rating: rating, text: text.slice(0, 1000) }).select().single()
+          .then(function (r) { upsert(C.reviews, mapReview(q(r, 'Не удалось сохранить отзыв'))); emit(true); });
+      });
     },
-    reviewsFor: function (sellerId) { return D.reviews.filter(function (r) { return r.sellerId === sellerId; }).sort(function (a, b) { return b.createdAt - a.createdAt; }); },
-    ordersOf: function (uid_, role) { return D.orders.filter(function (o) { return role === 'sell' ? o.sellerId === uid_ : o.buyerId === uid_; }).sort(function (a, b) { return b.createdAt - a.createdAt; }); },
-    txOf: function (uid_) { return D.transactions.filter(function (t) { return t.userId === uid_; }).sort(function (a, b) { return b.createdAt - a.createdAt; }); },
+    reviewsFor: function (sellerId) { return C.reviews.filter(function (r) { return r.sellerId === sellerId; }).sort(function (a, b) { return b.createdAt - a.createdAt; }); },
 
-    /* --- корзина --- */
-    cart: function () { var u = me(); return u ? (D.cart[u.id] || []).map(this.product).filter(function (p) { return p && p.status === 'active'; }) : []; },
-    cartAdd: function (pid) { var u = requireMe(); var c = D.cart[u.id] = D.cart[u.id] || []; if (c.indexOf(pid) < 0) c.push(pid); save(); },
-    cartRemove: function (pid) { var u = requireMe(); D.cart[u.id] = (D.cart[u.id] || []).filter(function (x) { return x !== pid; }); save(); },
+    /* --- корзина (в этом браузере) --- */
+    cart: function () { var L = local(), k = uidMe || 'guest'; return ((L.cart || {})[k] || []).map(product).filter(function (p) { return p && p.status === 'active'; }); },
+    cartAdd: function (pid) { requireMe(); var L = local(); L.cart = L.cart || {}; var c = L.cart[uidMe] = L.cart[uidMe] || []; if (c.indexOf(pid) < 0) c.push(pid); saveLocal(L); emit(true); },
+    cartRemove: function (pid) { var L = local(); L.cart = L.cart || {}; L.cart[uidMe || 'guest'] = (L.cart[uidMe || 'guest'] || []).filter(function (x) { return x !== pid; }); saveLocal(L); emit(true); },
 
-    /* --- избранное и «Вы смотрели» --- */
-    isFav: function (pid) { var u = me(); return !!(u && (D.favs[u.id] || []).indexOf(pid) >= 0); },
-    toggleFav: function (pid) { var u = requireMe(); var f = D.favs[u.id] = D.favs[u.id] || []; var i = f.indexOf(pid); if (i >= 0) f.splice(i, 1); else f.push(pid); save(); return i < 0; },
-    favs: function () { var u = me(); return u ? (D.favs[u.id] || []).map(this.product).filter(function (p) { return p && p.status !== 'removed'; }) : []; },
-    addViewed: function (pid) { var k = D.currentUserId || 'guest'; var v = (D.viewed[k] || []).filter(function (x) { return x !== pid; }); v.unshift(pid); D.viewed[k] = v.slice(0, 12); try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) {} },
-    viewed: function (exceptId) { var k = D.currentUserId || 'guest'; return (D.viewed[k] || []).filter(function (x) { return x !== exceptId; }).map(this.product).filter(function (p) { return p && p.status === 'active'; }); },
-    clearViewed: function () { D.viewed[D.currentUserId || 'guest'] = []; save(); },
+    /* --- избранное (в базе) и «Вы смотрели» (в браузере) --- */
+    isFav: function (pid) { return C.favs.indexOf(pid) >= 0; },
+    toggleFav: function (pid) {
+      requireMe();
+      var i = C.favs.indexOf(pid), on = i < 0;
+      if (on) C.favs.push(pid); else C.favs.splice(i, 1);
+      var req = on ? sb.from('favorites').insert({ user_id: uidMe, product_id: pid }) : sb.from('favorites').delete().eq('user_id', uidMe).eq('product_id', pid);
+      req.then(function (r) {
+        if (r.error && r.error.code !== '23505') { var j = C.favs.indexOf(pid); if (on && j >= 0) C.favs.splice(j, 1); if (!on && j < 0) C.favs.push(pid); EVSA.ui.err(dbErr(r.error, 'Не удалось обновить избранное')); emit(true); }
+      });
+      return on;
+    },
+    favs: function () { return C.favs.map(product).filter(function (p) { return p && p.status !== 'removed'; }); },
+    addViewed: function (pid) { var L = local(), k = uidMe || 'guest'; L.viewed = L.viewed || {}; var v = (L.viewed[k] || []).filter(function (x) { return x !== pid; }); v.unshift(pid); L.viewed[k] = v.slice(0, 12); saveLocal(L); },
+    viewed: function (exceptId) { var L = local(), k = uidMe || 'guest'; return ((L.viewed || {})[k] || []).filter(function (x) { return x !== exceptId; }).map(product).filter(function (p) { return p && p.status === 'active'; }); },
+    clearViewed: function () { var L = local(); L.viewed = L.viewed || {}; L.viewed[uidMe || 'guest'] = []; saveLocal(L); },
 
     /* --- чаты --- */
-    chatsOf: function (uid_) { return D.chats.filter(function (c) { return c.a === uid_ || c.b === uid_; }).sort(function (a, b) { return b.lastAt - a.lastAt; }); },
-    chat: function (id) { var u = me(); var c = D.chats.find(function (x) { return x.id === id; }); if (!c || !u || (c.a !== u.id && c.b !== u.id)) return null; return c; },
-    messages: function (chatId) { return D.messages.filter(function (m) { return m.chatId === chatId; }); },
-    openChat: function (productId) { var u = requireActive(); var p = this.product(productId); if (!p) fail('Товар не найден'); if (p.sellerId === u.id) fail('Это ваш товар'); var c = getOrCreateChat(u.id, p.sellerId, p.id); save(); return c; },
+    chatsOf: function (u) { return C.chats.filter(function (c) { return c.a === u || c.b === u; }).sort(function (a, b) { return b.lastAt - a.lastAt; }); },
+    chat: chat,
+    messages: function (chatId) { return C.messages.filter(function (m) { return m.chatId === chatId; }).sort(function (a, b) { return a.createdAt - b.createdAt; }); },
+    openChat: function (productId) {
+      return once('chat', function () {
+        var u = requireActive(), p = product(productId);
+        if (!p) fail('Товар не найден'); if (p.sellerId === u.id) fail('Это ваш товар');
+        var c = C.chats.find(function (x) { return x.productId === p.id && x.a === u.id; });
+        if (c) return c;
+        return sb.from('chats').insert({ id: uuid(), product_id: p.id, buyer_id: u.id, seller_id: p.sellerId }).select().single().then(function (r) {
+          if (r.error && r.error.code === '23505') return refreshChats().then(function () { return C.chats.find(function (x) { return x.productId === p.id && x.a === u.id; }); });
+          var c2 = upsert(C.chats, mapChat(q(r, 'Не удалось открыть чат'))); computeUnread(); emit(true); return c2;
+        });
+      });
+    },
     sendMessage: function (chatId, text) {
-      var u = requireActive(); var c = this.chat(chatId); if (!c) fail('Нет доступа к чату');
-      text = String(text || '').trim(); if (!text) return; var other = c.a === u.id ? c.b : c.a;
-      pushMsg(chatId, u.id, text);
-      notify(other, 'Новое сообщение от ' + u.name, '#/chat/' + chatId, 'message');
-      save();
+      return P(function () {
+        var u = requireActive(), c = chat(chatId); if (!c) fail('Нет доступа к чату');
+        text = String(text || '').trim(); if (!text) fail('Напишите сообщение'); if (text.length > 2000) fail('Сообщение слишком длинное (до 2000 символов)');
+        var id = uuid(), m = { id: id, chatId: chatId, from: u.id, text: text, system: false, createdAt: Date.now(), pending: true };
+        C.messages.push(m); c.lastAt = m.createdAt; emit(true);
+        return sb.from('messages').insert({ id: id, chat_id: chatId, sender_id: u.id, text: text }).then(function (r) {
+          if (r.error) { C.messages = C.messages.filter(function (x) { return x.id !== id; }); emit(true); throw dbErr(r.error, 'Сообщение не отправлено'); }
+          m.pending = false;
+          sb.functions.invoke('notify-message', { body: { message_id: id } }).catch(function () {});
+          return m;
+        });
+      });
     },
-    markRead: function (chatId) { var u = me(); var c = this.chat(chatId); if (c && u && c.unread[u.id]) { c.unread[u.id] = 0; save(); } },
-    unreadChats: function () { var u = me(); if (!u) return 0; var n = 0; D.chats.forEach(function (c) { n += c.unread[u.id] || 0; }); D.tickets.forEach(function (t) { if (t.userId === u.id) n += t.unreadUser || 0; }); return n; },
-
-    /* --- поддержка --- */
-    sendSupport: function (category, text, orderId) {
-      var u = requireMe(); text = String(text || '').trim();
-      if (text.length < 2) fail('Напишите сообщение');
-      if (EVSA.TICKET_CATEGORIES.indexOf(category) < 0) category = 'Другое';
-      var t = D.tickets.find(function (x) { return x.userId === u.id && x.category === category && x.status !== 'closed' && (!orderId || x.orderId === orderId); });
-      if (!t) { t = { id: uid('tk'), userId: u.id, category: category, orderId: orderId || null, status: 'open', createdAt: now(), messages: [], unreadUser: 0, unreadAdmin: 0 }; D.tickets.push(t); }
-      t.messages.push({ from: 'user', text: text.slice(0, 2000), at: now() }); t.status = 'open'; t.unreadAdmin++; t.updatedAt = now();
-      save(); return t;
+    markRead: function (chatId) {
+      var c = chat(chatId); if (!c || !uidMe || !c.unread[uidMe]) return;
+      var last = EVSA.db.messages(chatId).reduce(function (a, m) { return Math.max(a, m.createdAt); }, 0);
+      var at = new Date(Math.max(Date.now(), last + 1)).toISOString();
+      c.readAt[uidMe] = Date.parse(at); computeUnread();
+      var patch = {}; patch[c.a === uidMe ? 'buyer_read_at' : 'seller_read_at'] = at;
+      sb.from('chats').update(patch).eq('id', chatId).then(function () {});
+      setTimeout(function () { emit(); }, 0);
     },
-    ticketsOf: function (uid_) { return D.tickets.filter(function (t) { return t.userId === uid_; }); },
-    markSupportRead: function () { var u = me(); if (!u) return; var ch = false; D.tickets.forEach(function (t) { if (t.userId === u.id && t.unreadUser) { t.unreadUser = 0; ch = true; } }); if (ch) save(); },
+    unreadChats: function () { if (!uidMe) return 0; return C.chats.reduce(function (n, c) { return n + (c.unread[uidMe] || 0); }, 0); },
 
-    /* --- пополнение --- */
+    /* --- поддержка: см. remote.js --- */
+    sendSupport: function (category, text) {
+      var cur = me();
+      return new Promise(function (res, rej) {
+        EVSA.remoteSupport.send({ category: category, text: text, guest: !cur, contact: '', name: cur ? cur.name : 'Гость', username: cur && cur.username ? '@' + cur.username : '' }, function (e, t) { if (e) rej(e); else res(t); });
+      });
+    },
+    ticketsOf: function () { return []; },
+    markSupportRead: function () {},
+
+    /* --- пополнение (через бота, оплата скоро) --- */
     starsQuote: function (rub) { rub = Number(rub); return { rub: rub, stars: EVSA.topupStars(rub) }; },
-    /* ТОЛЬКО ДЕМО: тестовые рубли без оплаты (для проверки покупок) */
-    demoTopup: function (rub) {
-      var u = requireActive(); rub = Math.floor(Number(rub));
-      if (!(rub >= 10 && rub <= 100000)) fail('Сумма пополнения: от 10 до 100 000 ₽');
-      var d = { id: uid('d'), userId: u.id, method: 'demo', rub: rub, stars: 0, status: 'awaiting_payment', createdAt: now() };
-      D.deposits.push(d); save(); return this.demoCreditDeposit(d.id);
-    },
-    createStarsDeposit: function (rub) {
-      var u = requireActive(); rub = Math.floor(Number(rub));
-      if (!(rub >= 10 && rub <= 100000)) fail('Сумма пополнения: от 10 до 100 000 ₽');
-      var d = { id: uid('d'), userId: u.id, method: 'stars', rub: rub, stars: this.starsQuote(rub).stars, status: 'awaiting_payment', createdAt: now() };
-      D.deposits.push(d); save(); return d;
-    },
-    /* ТОЛЬКО ДЕМО: зачисляет тестовые (ненастоящие) рубли. На сервере — только после successful_payment от Telegram. */
-    demoCreditDeposit: function (depId) {
-      return once('dep:' + depId, function () {
-        var u = requireActive(); var d = D.deposits.find(function (x) { return x.id === depId; });
-        if (!d || d.userId !== u.id) fail('Заявка не найдена');
-        if (d.status !== 'awaiting_payment') fail('Эта заявка уже обработана');
-        d.status = 'demo_credited'; d.paidAt = now(); u.balance = money(u.balance + d.rub);
-        tx(u.id, 'deposit', d.rub, 'Тестовое пополнение (демо, не настоящие деньги)', d.id);
-        notify(u.id, 'Баланс пополнен на ' + d.rub + ' ₽ (тестовые)', '#/profile', 'money'); save(); return d;
-      });
-    },
-    createGiftDeposit: function (rub, giftNote) {
-      var u = requireActive(); rub = Math.floor(Number(rub));
-      if (!(rub >= 10 && rub <= 100000)) fail('Сумма: от 10 до 100 000 ₽');
-      var d = { id: uid('d'), userId: u.id, method: 'gift', rub: rub, note: String(giftNote || '').slice(0, 200), status: 'pending', createdAt: now() };
-      D.deposits.push(d); notify(u.id, 'Заявка на пополнение подарком создана. Ожидает проверки администратором.', '#/profile', 'money'); save(); return d;
-    },
-    depositsOf: function (uid_) { return D.deposits.filter(function (d) { return d.userId === uid_; }).sort(function (a, b) { return b.createdAt - a.createdAt; }); },
-
-    /* --- вывод --- */
-    withdraw: function (amount) {
-      return once('wd', function () {
-        var u = requireActive(); amount = Number(amount);
-        if (!(amount >= EVSA.WITHDRAW_MIN)) fail('Минимальная сумма вывода — ' + EVSA.WITHDRAW_MIN + ' ₽');
-        if (amount > u.balance) fail('Недостаточно средств');
-        u.balance = money(u.balance - amount); u.reserved = money(u.reserved + amount);
-        var w = { id: uid('w'), userId: u.id, amount: amount, status: 'pending', createdAt: now() };
-        D.withdrawals.push(w); tx(u.id, 'withdraw', -amount, 'Заявка на вывод (в резерве)', w.id);
-        notify(u.id, 'Заявка на вывод ' + amount + ' ₽ создана', '#/profile', 'money'); save(); return w;
-      });
-    },
-    withdrawalsOf: function (uid_) { return D.withdrawals.filter(function (w) { return w.userId === uid_; }).sort(function (a, b) { return b.createdAt - a.createdAt; }); },
-
-    /* --- уведомления --- */
-    notifications: function () { var u = me(); return u ? D.notifications.filter(function (n) { return n.userId === u.id; }).sort(function (a, b) { return b.createdAt - a.createdAt; }) : []; },
-    unreadNotifs: function () { return this.notifications().filter(function (n) { return !n.read; }).length; },
-    readAllNotifs: function () { this.notifications().forEach(function (n) { n.read = true; }); save(); },
-
-    /* =========== АДМИН =========== */
-    admin: {
-      users: function (q) { requireAdmin(); q = String(q || '').trim().replace(/^@/, '').toLowerCase(); return D.users.filter(function (u) { return !q || String(u.tgId).indexOf(q) >= 0 || u.name.toLowerCase().indexOf(q) >= 0 || (u.username || '').toLowerCase().indexOf(q) >= 0; }); },
-      ban: function (userId, reason) {
-        requireAdmin(); var u = user(userId); if (!u) fail('Пользователь не найден');
-        reason = String(reason || '').trim(); if (reason.length < 3) fail('Укажите причину');
-        D.warnings.push({ id: uid('wr'), userId: u.id, reason: reason, createdAt: now() }); u.warnings++;
-        var perm = u.warnings >= 2;
-        u.ban = { perm: perm, until: perm ? null : now() + DAY, reason: reason, at: now() };
-        D.bans.push({ id: uid('b'), userId: u.id, perm: perm, until: u.ban.until, reason: reason, createdAt: now(), action: 'ban' });
-        adminLog(perm ? 'Перманентная блокировка' : 'Блокировка на 24 часа', u.id, reason);
-        notify(u.id, perm ? 'Ваш аккаунт заблокирован навсегда. Причина: ' + reason : 'Ваш аккаунт заблокирован на 24 часа. Причина: ' + reason, '#/support', 'bad'); save(); return u.ban;
-      },
-      unban: function (userId) { requireAdmin(); var u = user(userId); if (!u) fail('Не найден'); u.ban = null; D.bans.push({ id: uid('b'), userId: u.id, action: 'unban', createdAt: now() }); adminLog('Разблокировка', u.id, ''); notify(u.id, 'Ваш аккаунт разблокирован', '#/', 'info'); save(); },
-      adjust: function (userId, delta, reason) {
-        requireAdmin(); var u = user(userId); delta = Number(delta); reason = String(reason || '').trim();
-        if (!u) fail('Не найден'); if (!delta || !isFinite(delta)) fail('Укажите сумму (например 100 или -50)');
-        if (reason.length < 3) fail('Причина обязательна'); if (u.balance + delta < 0) fail('Баланс не может стать отрицательным');
-        u.balance = money(u.balance + delta); tx(u.id, 'admin', delta, 'Корректировка администратором: ' + reason);
-        adminLog('Корректировка баланса ' + (delta > 0 ? '+' : '') + delta + ' ₽', u.id, reason); save();
-      },
-      reply: function (ticketId, text) {
-        requireAdmin(); var t = D.tickets.find(function (x) { return x.id === ticketId; }); text = String(text || '').trim();
-        if (!t) fail('Обращение не найдено'); if (!text) fail('Введите ответ');
-        t.messages.push({ from: 'support', text: text.slice(0, 2000), at: now() }); t.status = 'answered'; t.unreadUser++; t.unreadAdmin = 0; t.updatedAt = now();
-        notify(t.userId, 'Поддержка ответила на ваше обращение', '#/support', 'message'); adminLog('Ответ в поддержке', t.userId, text.slice(0, 80)); save();
-      },
-      closeTicket: function (ticketId) { requireAdmin(); var t = D.tickets.find(function (x) { return x.id === ticketId; }); if (t) { t.status = 'closed'; t.unreadAdmin = 0; save(); } },
-      resolveDispute: function (orderId, toBuyer) {
-        requireAdmin(); var o = D.orders.find(function (x) { return x.id === orderId; }); if (!o || o.status !== 'dispute') fail('Спор не найден');
-        var b = user(o.buyerId), s = user(o.sellerId); b.reserved = money(b.reserved - o.price);
-        if (toBuyer) { b.balance = money(b.balance + o.price); o.status = 'refunded'; tx(b.id, 'refund', o.price, 'Возврат по спору «' + o.title + '»', o.id); }
-        else { s.balance = money(s.balance + o.price); o.status = 'completed'; o.completedAt = now(); tx(s.id, 'sale', o.price, 'Продажа «' + o.title + '» (решение спора)', o.id); }
-        pushMsg(o.chatId, 'system', toBuyer ? 'Спор решён в пользу покупателя. Деньги возвращены.' : 'Спор решён в пользу продавца. Деньги переведены продавцу.', true);
-        notify(b.id, 'Спор по «' + o.title + '» решён', '#/chat/' + o.chatId, 'deal'); notify(s.id, 'Спор по «' + o.title + '» решён', '#/chat/' + o.chatId, 'deal');
-        adminLog('Решение спора: ' + (toBuyer ? 'возврат покупателю' : 'выплата продавцу'), o.buyerId, o.id); save();
-      },
-      setWithdrawal: function (wId, status) {
-        requireAdmin(); var w = D.withdrawals.find(function (x) { return x.id === wId; }); if (!w) fail('Заявка не найдена');
-        var u = user(w.userId); var allowed = { pending: ['approved', 'rejected'], approved: ['done', 'rejected'] };
-        if (!(allowed[w.status] || []).includes(status)) fail('Недопустимый переход статуса');
-        w.status = status; w.updatedAt = now();
-        if (status === 'done') { u.reserved = money(u.reserved - w.amount); }
-        if (status === 'rejected') { u.reserved = money(u.reserved - w.amount); u.balance = money(u.balance + w.amount); tx(u.id, 'refund', w.amount, 'Вывод отклонён, средства возвращены', w.id); }
-        var names = { approved: 'одобрена', done: 'выполнена', rejected: 'отклонена' };
-        notify(u.id, 'Заявка на вывод ' + w.amount + ' ₽ ' + names[status], '#/profile', 'money'); adminLog('Вывод ' + names[status], u.id, w.amount + ' ₽'); save();
-      },
-      setDeposit: function (dId, ok) {
-        requireAdmin(); var d = D.deposits.find(function (x) { return x.id === dId; }); if (!d || d.status !== 'pending') fail('Заявка уже обработана');
-        var u = user(d.userId); d.status = ok ? 'confirmed' : 'rejected'; d.updatedAt = now();
-        if (ok) { u.balance = money(u.balance + d.rub); tx(u.id, 'deposit', d.rub, 'Пополнение подарком (подтверждено администратором)', d.id); }
-        notify(u.id, ok ? 'Пополнение подарком подтверждено: +' + d.rub + ' ₽' : 'Пополнение подарком отклонено', '#/profile', 'money');
-        adminLog(ok ? 'Подтверждение подарка' : 'Отклонение подарка', u.id, d.rub + ' ₽'); save();
-      }
-    }
+    notifications: function () { return []; }, unreadNotifs: function () { return 0; }, readAllNotifs: function () {}
   };
 })();

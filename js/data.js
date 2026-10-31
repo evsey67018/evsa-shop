@@ -67,7 +67,7 @@ EVSA.findTarget = function (type, id) {
   return (type === 'site' ? EVSA.SITES : EVSA.GAMES).find(function (x) { return x.id === id; }) || null;
 };
 /* Настоящие иконки игр и сервисов лежат локально в assets/icons/<id>.webp (без хотлинка) */
-EVSA.ICON_V = '20261031f';
+EVSA.ICON_V = '20261031g';
 /* Склонение: 1 предложение, 2 предложения, 5 предложений */
 EVSA.plural = function (n, one, few, many) { var a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return many; if (b > 1 && b < 5) return few; if (b === 1) return one; return many; };
 EVSA.offersText = function (n) { return n ? n + ' ' + EVSA.plural(n, 'предложение', 'предложения', 'предложений') : 'Пока нет предложений'; };
@@ -85,7 +85,7 @@ EVSA.DELIVERY_BY_CAT = { accounts: 'Передача аккаунта', boost: '
 /* Промо-баннеры для карусели на главной */
 EVSA.BANNERS = [
   { title: 'Безопасные сделки', text: 'Деньги продавцу — только после того, как вы подтвердите получение товара.', cta: 'Как это работает', href: '#/guarantee', c1: '#7c3aed', c2: '#0b0b12' },
-  { title: 'Продавайте на EVSA SHOP', text: 'Выставьте товар бесплатно или поднимите его в топ с Premium всего за 19 ₽.', cta: 'Продать товар', href: '#/sell', c1: '#0891b2', c2: '#06070a' },
+  { title: 'Продавайте на EVSA SHOP', text: 'Выставьте товар бесплатно — его сразу увидят все покупатели. Premium-размещение скоро.', cta: 'Продать товар', href: '#/sell', c1: '#0891b2', c2: '#06070a' },
   { title: 'Самые дешёвые товары в EVSA SHOP', text: 'Все предложения площадки от самых недорогих — выбирайте выгодно.', cta: 'Смотреть дешёвые', href: '#/cheap', c1: '#16a34a', c2: '#04100a' },
   { title: 'Все игры и сервисы в одном месте', text: EVSA.GAMES.length + ' игр и ' + EVSA.SITES.length + ' сайтов и приложений: аккаунты, донат, буст, промокоды и не только.', cta: 'Открыть каталог', href: '#/games', c1: '#7c3aed', c2: '#0a0614' }
 ];

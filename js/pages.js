@@ -16,7 +16,8 @@
   EVSA.icons = I;
 
   function needLogin(el, text) {
-    el.innerHTML = '<div class="page"><div class="card" style="max-width:520px;margin:40px auto;text-align:center"><div class="success-burst" style="background:radial-gradient(circle,rgba(139,92,246,.35),transparent 70%)">' + I.tg.replace('<svg', '<svg style="width:40px;height:40px;color:#a78bfa"') + '</div>' +
+    if (!db.ready() && db.maybeAuthed()) { el.innerHTML = '<div class="page">' + U.skelRows(3) + '</div>'; return; }
+    el.innerHTML = '<div class="page"><div class="card" style="max-width:520px;margin:40px auto;text-align:center"><div class="success-burst tg-burst" style="background:radial-gradient(circle,rgba(139,92,246,.35),transparent 70%)">' + I.tg.replace('<svg', '<svg style="width:40px;height:40px;color:#a78bfa"') + '</div>' +
       '<h2>' + esc(text || 'Нужен вход') + '</h2><p class="muted">Войдите через Telegram, чтобы покупать, продавать и общаться.</p><button class="btn primary" data-act="login">' + I.tg + 'Войти через Telegram</button></div></div>';
   }
   P.needLogin = needLogin;
@@ -70,7 +71,7 @@
       '<section class="section">' + arrowsHead('Популярные сайты:', 'railSites', '#/games') + '<div class="rail" id="railSites">' + railTiles(sites, 'site', '#/games', true) + '</div></section>' +
       viewedSection() +
       (prem.length ? '<section class="section"><div class="section-head"><h2>Премиум товары</h2><span class="muted small">' + total + ' ' + EVSA.plural(total, 'объявление', 'объявления', 'объявлений') + ' на площадке</span></div><div class="pgrid">' + prem.map(U.pcard).join('') + '</div></section>' : '') +
-      (hot.length ? '<section class="section"><div class="section-head"><h2>Хиты продаж</h2></div><div class="pgrid">' + hot.map(U.pcard).join('') + '</div></section>' : (total ? '' : '<section class="section">' + emptySell('#/sell', 'Магазин только открылся. Выставьте первый товар — его увидят все покупатели') + '</section>')) + '</div>';
+      (!db.ready() ? '<section class="section"><div class="section-head"><h2>Хиты продаж</h2></div>' + U.skelCards(4) + '</section>' : hot.length ? '<section class="section"><div class="section-head"><h2>Хиты продаж</h2></div><div class="pgrid">' + hot.map(U.pcard).join('') + '</div></section>' : (total ? '' : '<section class="section">' + emptySell('#/sell', 'Магазин только открылся. Выставьте первый товар — его увидят все покупатели') + '</section>')) + '</div>';
     bindScroll(el);
     var car = U.$('#carousel', el), idx = 0, slides = U.$('.slides', car), dots = U.$$('.dots button', car);
     function go(i) { idx = (i + B.length) % B.length; slides.style.transform = 'translateX(' + (-100 * idx) + '%)'; dots.forEach(function (d, j) { d.classList.toggle('on', j === idx); }); }
@@ -121,7 +122,7 @@
     function draw() {
       var list = db.products({ targetType: type, targetId: id, category: cat || null, search: st.search, sort: st.sort, online: st.online, discountOnly: st.discountOnly, withReviews: st.withReviews, delivery: st.delivery, minPrice: st.minPrice, maxPrice: st.maxPrice });
       var filtered = st.search || st.online || st.discountOnly || st.withReviews || st.delivery || st.minPrice || st.maxPrice;
-      U.$('#plist', el).innerHTML = list.length ? '<div class="pgrid">' + list.map(U.pcard).join('') + '</div>' :
+      U.$('#plist', el).innerHTML = !db.ready() ? U.skelCards(4) : list.length ? '<div class="pgrid">' + list.map(U.pcard).join('') + '</div>' :
         (filtered ? U.empty('Ничего не найдено', 'Попробуйте изменить фильтры') : emptySell('#/sell?t=' + type + '&id=' + id + (cat ? '&c=' + cat : ''), 'Здесь пока пусто. Выставьте товар по «' + t.name + '» первым — покупатели увидят его сразу'));
     }
     U.$('#catSearch', el).oninput = function (e) { st.search = e.target.value; draw(); };
@@ -136,28 +137,29 @@
   /* ================= СТРАНИЦА ТОВАРА ================= */
   P.product = function (el, id) {
     var p = db.product(id);
-    if (!p || p.status === 'removed') { el.innerHTML = '<div class="page">' + U.empty('Товар не найден', 'Возможно, он снят с продажи', '<br><button class="btn" data-href="#/">На главную</button>') + '</div>'; return; }
+    if (!p && !db.ready()) { el.innerHTML = '<div class="page"><div class="pp"><div class="pp-img skel" style="aspect-ratio:16/10"></div><div class="card"><div class="skel skel-line" style="height:26px;width:80%"></div><div class="skel skel-line" style="width:50%"></div><div class="skel skel-line" style="height:40px;margin-top:20px"></div></div></div></div>'; return; }
+    if (!p || p.status === 'removed') { el.innerHTML = '<div class="page">' + U.empty('Товар не найден', 'Возможно, он снят с продажи', '<button class="btn" data-href="#/">На главную</button>') + '</div>'; return; }
     var s = db.user(p.sellerId), st = db.sellerStats(s.id), t = EVSA.findTarget(p.targetType, p.targetId), d = U.discount(p.oldPrice, p.price), me = db.me();
     var reviews = db.reviewsFor(s.id);
     var mine = me && me.id === s.id, fav = db.isFav(p.id);
     var other = db.products({ sellerId: s.id, sort: 'popular' }).filter(function (x) { return x.id !== p.id; }).slice(0, 4);
     var similar = db.products({ targetType: p.targetType, targetId: p.targetId, category: p.category, sort: 'popular' }).filter(function (x) { return x.id !== p.id && x.sellerId !== s.id; }).slice(0, 8);
-    var guarantee = '<div class="guar"><i>' + I.check + '</i>Возврат средств, если вы не получили товар</div><div class="guar"><i>' + I.check + '</i>Возврат средств, если товар не соответствует описанию</div>';
+    var guarantee = '<div class="guar"><i>' + I.check + '</i>С оплатой на сайте — возврат, если товар не получен</div><div class="guar"><i>' + I.check + '</i>…и если товар не соответствует описанию</div>';
     el.innerHTML = '<div class="page"><div class="row small muted" style="margin-bottom:14px;flex-wrap:wrap;gap:8px"><button class="icon-btn" data-act="back" aria-label="Назад">' + I.left + '</button>' + U.miniIcon(t) + '<a href="#/t/' + p.targetType + '/' + t.id + '">' + esc(t.name) + '</a><a class="pill" href="#/t/' + p.targetType + '/' + t.id + '/' + p.category + '">' + EVSA.catName(p.category) + '</a></div>' +
       '<div class="pp"><div><div class="pp-img">' + U.imgTag(p) + (p.premium ? '<span class="badge-prem">★ PREMIUM</span>' : '') +
       '<button class="fav-big' + (fav ? ' on' : '') + '" data-act="fav" data-id="' + p.id + '">' + I.heart + '<span>' + (fav ? 'В избранном' : 'В избранное') + '</span></button></div>' +
       '<div class="card" style="margin-top:14px"><h3 style="margin-bottom:8px">Описание</h3><div class="desc">' + esc(p.desc) + '</div>' +
       (mine ? '' : '<button class="link-btn" style="margin-top:12px" data-act="report" data-id="' + p.id + '">' + I.flag + 'Пожаловаться</button>') + '</div></div>' +
       '<div><div class="card"><h1 style="font-size:22px;margin-bottom:6px">' + esc(p.title) + '</h1>' +
-      '<div class="small muted">' + (st.count ? '<span class="stars">' + st.rating.toFixed(1) + ' ★</span> ' + st.count + ' отзывов' : 'Пока нет отзывов') + ' · продано ' + p.sales + '</div>' +
+      '<div class="small muted">' + (st.count ? '<span class="stars">' + st.rating.toFixed(1) + ' ★</span> ' + st.count + ' ' + EVSA.plural(st.count, 'отзыв', 'отзыва', 'отзывов') : 'Пока нет отзывов') + ' · продано ' + p.sales + '</div>' +
       '<h3 style="margin:16px 0 4px">Характеристики</h3><div class="chars"><div><span>Игра / сервис</span>' + esc(t.name) + '</div><div><span>Тип</span>' + EVSA.catName(p.category) + '</div><div><span>Способ получения</span>' + esc(p.delivery || EVSA.DELIVERY_BY_CAT[p.category]) + '</div>' + (p.qty > 1 ? '<div><span>В наличии</span>' + p.qty + ' шт.</div>' : '') + '</div>' +
       guarantee +
       '<div class="pp-price price" style="margin:16px 0 4px"><b' + (d ? ' class="red"' : '') + '>' + U.rub(p.price) + '</b>' + (d ? '<span class="disc-pill">−' + d + '%</span><s>' + U.rub(p.oldPrice) + '</s>' : '') + '</div>' +
       '<div class="tiny muted" style="margin-bottom:14px">Опубликовано ' + U.date(p.createdAt) + (p.status === 'sold' ? ' · <b style="color:#f87171">Продан</b>' : '') + '</div>' +
       (mine ? '<div class="note">Это ваше объявление.</div><div class="row" style="margin-top:10px"><button class="btn danger block" data-act="removeProduct" data-id="' + p.id + '">Снять с продажи</button></div>' :
-        '<div class="stack"><button class="btn primary block lg" data-act="buy" data-id="' + p.id + '"' + (p.status !== 'active' ? ' disabled' : '') + '>Купить</button>' +
-        '<div class="row"><button class="btn block" data-act="chatSeller" data-id="' + p.id + '">' + I.chat + 'Написать продавцу</button><button class="btn" data-act="cartAdd" data-id="' + p.id + '" aria-label="В корзину"' + (p.status !== 'active' ? ' disabled' : '') + '>' + I.cart + '</button></div></div>') +
-      '<div class="row between small" style="margin-top:12px"><a href="#/guarantee" class="row" style="gap:6px">' + I.shield + 'Наша гарантия</a><a href="#/referral" class="muted">Пригласить друга</a></div></div>' +
+        '<div class="stack"><div class="soon-box"><b>Оплата скоро</b><span class="small muted">Купить на сайте пока нельзя — напишите продавцу, чтобы уточнить детали.</span></div>' +
+        '<div class="row"><button class="btn primary block lg" data-act="chatSeller" data-id="' + p.id + '"' + (p.status !== 'active' ? ' disabled' : '') + '>' + I.chat + 'Написать продавцу</button><button class="btn lg" data-act="cartAdd" data-id="' + p.id + '" aria-label="В корзину" title="В корзину"' + (p.status !== 'active' ? ' disabled' : '') + '>' + I.cart + '</button></div></div>') +
+      '<div class="row between small" style="margin-top:12px"><a href="#/guarantee" class="row" style="gap:6px">' + I.shield + 'Как будет работать гарантия</a><a href="#/referral" class="muted">Пригласить друга</a></div></div>' +
       '<div class="card"><h3 style="margin-bottom:10px">Продавец</h3><div class="row" style="cursor:pointer" data-href="#/u/' + s.id + '"><span class="ava-wrap">' + U.avatar(s, 'l') + (db.isOnline(s) ? '<span class="online-dot"></span>' : '') + '</span><div class="grow"><h3>' + esc(s.name) + '</h3><div class="small">' + (st.count ? '<span class="stars">' + st.rating.toFixed(1) + ' ★</span> ' + st.count + ' отзывов · ' : '') + st.sales + ' сделок · ' + (db.isOnline(s) ? '<span style="color:#4ade80">онлайн</span>' : '<span class="muted">не в сети</span>') + '</div></div>' + I.right + '</div></div></div></div>' +
       '<section class="section" style="margin-top:28px"><div class="section-head"><h2>Отзывы продавца</h2>' + (reviews.length > 3 ? '<a class="btn sm ghost" href="#/u/' + s.id + '">Все отзывы (' + reviews.length + ') ' + I.right + '</a>' : '') + '</div>' +
       (reviews.length ? '<div class="big-rating"><b>' + st.rating.toFixed(1) + '</b><div>' + U.stars(st.rating) + '<div class="tiny muted">' + st.count + ' отзывов</div></div></div><div class="rv-grid">' + reviews.slice(0, 3).map(reviewCard).join('') + '</div><div class="tiny muted" style="margin-top:10px">' + I.check.replace('<svg', '<svg style="width:14px;height:14px;vertical-align:-2px"') + ' Отзывы оставлены после покупки</div>' : '<div class="card muted small">У продавца пока нет отзывов</div>') + '</section>' +
@@ -179,7 +181,8 @@
 
   /* ================= ПРОФИЛЬ ПРОДАВЦА ================= */
   P.seller = function (el, id) {
-    var s = db.user(id); if (!s) { el.innerHTML = '<div class="page">' + U.empty('Пользователь не найден') + '</div>'; return; }
+    if (!db.ready() && !db.raw().users.some(function (u) { return u.id === id; })) { el.innerHTML = '<div class="page">' + U.skelRows(1) + U.skelCards(2) + '</div>'; return; }
+    var s = db.user(id); if (!s || s.missing) { el.innerHTML = '<div class="page">' + U.empty('Пользователь не найден') + '</div>'; return; }
     var st = db.sellerStats(id), list = db.products({ sellerId: id }), rv = db.reviewsFor(id);
     el.innerHTML = '<div class="page"><div class="card"><div class="prof-top">' + U.avatar(s, 'xl') + '<div><h1>' + esc(s.name) + (db.isBanned(s) ? ' <span class="status banned">заблокирован</span>' : '') + '</h1>' +
       (s.username ? '<div class="muted">@' + esc(s.username) + '</div>' : '') + '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' отзывов · ' + st.sales + ' сделок</div><div class="tiny muted">На EVSA SHOP с ' + U.date(s.createdAt) + '</div></div></div></div>' +
@@ -204,7 +207,7 @@
   P.cheap = function (el) {
     var list = db.products({ sort: 'cheap' });
     el.innerHTML = '<div class="page"><div class="row between" style="margin-bottom:16px;flex-wrap:wrap;gap:8px"><h1>Самые дешёвые товары</h1>' + (list.length ? '<span class="muted small">' + list.length + ' ' + EVSA.plural(list.length, 'товар', 'товара', 'товаров') + ' · сначала дешёвые</span>' : '') + '</div>' +
-      (list.length ? '<div class="pgrid">' + list.slice(0, 120).map(U.pcard).join('') + '</div>' : emptySell('#/sell', 'Здесь появятся самые выгодные предложения площадки')) + '</div>';
+      (!db.ready() ? U.skelCards(6) : list.length ? '<div class="pgrid">' + list.slice(0, 120).map(U.pcard).join('') + '</div>' : emptySell('#/sell', 'Здесь появятся самые выгодные предложения площадки')) + '</div>';
   };
 
   /* ================= КОРЗИНА ================= */
@@ -214,9 +217,9 @@
     el.innerHTML = '<div class="page"><h1 style="margin-bottom:16px">Корзина</h1>' + (items.length ?
       '<div class="card">' + items.map(function (p) {
         return '<div class="list-row"><img src="' + esc(U.pimg(p)) + '" alt="" style="width:72px;height:46px;object-fit:cover;border-radius:10px;cursor:pointer" data-href="#/p/' + p.id + '"><div class="grow"><b class="small" data-href="#/p/' + p.id + '" style="cursor:pointer">' + esc(p.title) + '</b><div class="tiny muted">' + esc(db.user(p.sellerId).name) + '</div></div><b>' + U.rub(p.price) + '</b><button class="btn sm ghost" data-act="cartRemove" data-id="' + p.id + '" aria-label="Убрать">✕</button></div>';
-      }).join('') + '</div><div class="card"><div class="row between"><span class="muted">Итого</span><b style="font-size:22px">' + U.rub(total) + '</b></div><div class="row between small" style="margin:6px 0 14px"><span class="muted">Ваш баланс</span><span>' + U.rub(me.balance) + '</span></div>' +
-      '<button class="btn primary block" data-act="buyCart">Купить всё через безопасную сделку</button><div class="tiny muted" style="margin-top:8px">По каждому товару откроется отдельный чат сделки с продавцом.</div></div>' :
-      U.empty('Корзина пуста', 'Добавляйте товары кнопкой с тележкой на странице товара', '<br><button class="btn" data-href="#/">К покупкам</button>')) + '</div>';
+      }).join('') + '</div><div class="card"><div class="row between" style="margin-bottom:14px"><span class="muted">Итого</span><b style="font-size:22px">' + U.rub(total) + '</b></div>' +
+      '<button class="btn primary block" data-act="buyCart">Оплата скоро</button><div class="tiny muted" style="margin-top:8px">Оплата на сайте ещё не подключена. Откройте товар и нажмите «Написать продавцу».</div></div>' :
+      U.empty('Корзина пуста', 'Добавляйте товары кнопкой с тележкой на странице товара', '<button class="btn" data-href="#/">К покупкам</button>')) + '</div>';
   };
 
   /* ================= УВЕДОМЛЕНИЯ ================= */
