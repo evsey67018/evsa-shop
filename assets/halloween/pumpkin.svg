@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 112">
+<defs>
+<radialGradient id="b" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="#ffb347"/><stop offset=".55" stop-color="#ff7a00"/><stop offset="1" stop-color="#b34700"/></radialGradient>
+<radialGradient id="l" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#fff6b0"/><stop offset=".6" stop-color="#ffd23f"/><stop offset="1" stop-color="#ff9a00"/></radialGradient>
+</defs>
+<path d="M58 22c-1-8 1-15 7-20 2-1 4 1 3 3-3 4-4 10-3 17z" fill="#4d7a1f"/>
+<path d="M66 12c8-6 18-5 24 1-7-1-14 0-20 4z" fill="#6aa52b"/>
+<ellipse cx="38" cy="66" rx="30" ry="40" fill="url(#b)"/>
+<ellipse cx="82" cy="66" rx="30" ry="40" fill="url(#b)"/>
+<ellipse cx="60" cy="66" rx="30" ry="43" fill="url(#b)"/>
+<path d="M60 24c-9 12-9 72 0 85M60 24c9 12 9 72 0 85" fill="none" stroke="#c45400" stroke-width="2" opacity=".55"/>
+<path d="M36 52l14 3-9 11zM84 52l-14 3 9 11z" fill="url(#l)"/>
+<path d="M56 66l4-7 4 7z" fill="url(#l)"/>
+<path d="M30 76c10 10 20 14 30 14s20-4 30-14l-4 12-6-4-5 8-6-5-5 9-5-9-6 5-5-8-6 4z" fill="url(#l)"/>
+</svg>
