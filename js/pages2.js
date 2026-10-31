@@ -182,8 +182,19 @@
     if (live && U.$('#supInner', el)) { U.$('#supInner', el).innerHTML = head + '<div class="msgs" id="msgs">' + msgs + '</div>'; U.$('.chat-list', el).innerHTML = chatListHtml('support'); }
     else {
       el.innerHTML = '<div class="page"><div class="chat-layout has-chat"><div class="chat-list">' + chatListHtml('support') + '</div><div class="chat-win"><div id="supInner" style="display:flex;flex-direction:column;flex:1;min-height:0">' + head + '<div class="msgs" id="msgs">' + msgs + '</div></div>' +
-        '<form class="composer" id="supForm" style="flex-wrap:wrap"><select class="select" id="supCat" style="flex:1 1 100%">' + EVSA.TICKET_CATEGORIES.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select><input class="input" id="supText" placeholder="Опишите проблему…" maxlength="2000" autocomplete="off"><button class="btn primary" aria-label="Отправить">' + I.send + '</button></form></div></div></div>';
-      U.$('#supForm', el).onsubmit = function (e) { e.preventDefault(); var i = U.$('#supText', el); U.try(function () { db.sendSupport(U.$('#supCat', el).value, i.value); i.value = ''; EVSA.sound.success(); U.toast('Обращение отправлено в поддержку', 'ok'); }); };
+        '<form class="composer" id="supForm" style="flex-wrap:wrap"><select class="select" id="supCat" style="flex:1 1 100%">' + EVSA.TICKET_CATEGORIES.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select><input class="input" id="supText" placeholder="Опишите проблему…" maxlength="' + EVSA.remoteSupport.MAX_TEXT + '" autocomplete="off"><button class="btn primary" id="supBtn" aria-label="Отправить">' + I.send + '</button><div class="tiny muted" style="flex:1 1 100%">Сообщения отправляются команде EVSA SHOP. Не пишите пароли и коды из SMS.</div></form></div></div></div>';
+      U.$('#supForm', el).onsubmit = function (e) {
+        e.preventDefault(); var i = U.$('#supText', el), btn = U.$('#supBtn', el), cat = U.$('#supCat', el).value, text = i.value.trim();
+        if (btn.disabled) return;
+        var left = EVSA.remoteSupport.cooldownLeft();
+        if (left > 0) return U.err({ userMessage: 'Подождите ' + Math.ceil(left / 1000) + ' с перед следующим обращением' });
+        var t = U.try(function () { return db.sendSupport(cat, text); }); if (!t) return;
+        i.value = ''; btn.disabled = true;
+        EVSA.remoteSupport.send({ category: cat, text: text, name: me.name, username: me.username ? '@' + me.username : '', localTicketId: t.id })
+          .then(function (r) { EVSA.sound.success(); U.toast('Обращение отправлено в поддержку (№ ' + r.ticketId + ')', 'ok'); },
+                function (err) { U.err({ userMessage: (err && err.userMessage) || 'Не удалось отправить обращение. Попробуйте позже.' }); })
+          .then(function () { btn.disabled = false; });
+      };
     }
     var box = U.$('#msgs', el); box.scrollTop = box.scrollHeight;
   };
