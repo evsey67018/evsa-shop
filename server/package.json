@@ -1,0 +1,10 @@
+{
+  "name": "evsa-shop-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Каркас backend для EVSA SHOP (Node.js + PostgreSQL). Не используется живым демо-сайтом.",
+  "main": "src/index.js",
+  "scripts": { "start": "node src/index.js", "migrate": "psql \"$DATABASE_URL\" -f db/schema.sql" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "express": "^4.19.2", "pg": "^8.11.5", "helmet": "^7.1.0", "express-rate-limit": "^7.2.0", "jsonwebtoken": "^9.0.2" }
+}
