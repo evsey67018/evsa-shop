@@ -1,0 +1,15 @@
+{
+  "name": "EVSA SHOP — донат и игровые товары",
+  "short_name": "EVSA SHOP",
+  "description": "Маркетплейс игровых товаров: аккаунты, донат, буст и промокоды.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0510",
+  "theme_color": "#0a0510",
+  "icons": [
+    { "src": "assets/icons-app/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons-app/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
