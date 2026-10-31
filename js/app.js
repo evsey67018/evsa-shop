@@ -45,11 +45,23 @@
     try { nav = fn ? fn(r.parts.slice(1), r.q) : (view.innerHTML = '<div class="page">' + U.empty('Страница не найдена', '', '<br><button class="btn" data-href="#/">На главную</button>') + '</div>', ''); }
     catch (e) { console.error(e); view.innerHTML = '<div class="page">' + U.empty('Ошибка', 'Не удалось открыть страницу', '<br><button class="btn" data-href="#/">На главную</button>') + '</div>'; }
     current = { name: nav, key: location.hash };
+    setTitle(key, r.parts);
     U.$$('.sidebar a').forEach(function (a) { a.classList.toggle('active', a.dataset.nav === nav || (nav === 'home' && a.dataset.nav === 'home')); });
     U.$$('.bottom-tabs a').forEach(function (a) { a.classList.toggle('active', a.dataset.tab === nav); });
     document.body.classList.remove('nav-open');
     if (keepScroll) window.scrollTo(0, y); else window.scrollTo(0, 0);
     updateChrome();
+  }
+
+  /* ---------- заголовок вкладки по странице ---------- */
+  var BASE_TITLE = 'EVSA SHOP — донат и игровые товары';
+  var TITLES = { games: 'Все игры', cheap: 'Самые дешёвые товары', search: 'Поиск', cart: 'Корзина', profile: 'Профиль', sell: 'Продать товар',
+    chats: 'Сообщения', chat: 'Чат', support: 'Поддержка', settings: 'Настройки', favorites: 'Избранное', referral: 'Приглашай друзей',
+    steam: 'Пополнение Steam', guarantee: 'Наша гарантия', p: 'Товар', u: 'Продавец' };
+  function setTitle(key, parts) {
+    var t = TITLES[key] || '';
+    try { if (key === 't') { var tg = EVSA.findTarget(parts[1], parts[2]); if (tg) t = tg.name; } } catch (e) {}
+    document.title = t ? t + ' — EVSA SHOP' : BASE_TITLE;
   }
 
   /* ---------- шапка, бейджи, кнопка профиля ---------- */
