@@ -176,8 +176,29 @@
   /* история обращений хранится в этом браузере (сами обращения уходят команде и не читаются обратно) */
   function guestHist() { return supHist(); }
   function guestPush(x) { try { var me = db.me(), a = supHist(); a.push(x); localStorage.setItem(GKEY + (me ? '_' + me.id : ''), JSON.stringify(a.slice(-50))); } catch (e) {} }
+  /* переписка с поддержкой из базы (свои сообщения + ответы поддержки; RLS: только свои) */
+  var srvSup = null;
+  function loadSrvSup(el) {
+    var me = db.me(), sb = EVSA.sb; if (!me || !sb) return;
+    try {
+      sb.from('support_tickets').select('id,category,text,kind,created_at').order('created_at', { ascending: false }).limit(100).then(function (r) {
+        if (r.error || !r.data || !db.me() || db.me().id !== me.id) return;
+        srvSup = { uid: me.id, rows: r.data.slice().reverse() };
+        if (/^#\/support/.test(location.hash) && U.$('#supInner', el)) { P.support(el, true); var b = U.$('#msgs', el); if (b) b.scrollTop = b.scrollHeight; }
+      }, function () {});
+    } catch (e) {}
+  }
+  function srvMsgs(me) {
+    if (!me || !srvSup || srvSup.uid !== me.id || !srvSup.rows.length) return null;
+    return srvSup.rows.map(function (m) {
+      var at = new Date(m.created_at).getTime();
+      if (m.kind === 'reply') return '<div class="msg them"><span class="ava s" style="background:linear-gradient(135deg,#22d3ee,#3b82f6)">ES</span><div><div class="tiny muted" style="margin-bottom:3px">Поддержка EVSA SHOP</div><div class="bubble">' + esc(m.text) + '</div><div class="time">' + U.date(at) + ' · ' + U.time(at) + '</div></div></div>';
+      return '<div class="msg me"><div><div class="tiny muted" style="text-align:right;margin-bottom:3px">' + esc(me.name) + ' · <span class="status open" style="font-size:10px;padding:1px 6px">' + esc(m.category) + '</span></div><div class="bubble">' + esc(m.text) + '</div><div class="time" style="text-align:right">' + U.date(at) + ' · ' + U.time(at) + ' · отправлено ✓</div></div></div>';
+    }).join('');
+  }
   function supportMsgs(me) {
     var sys = '<div class="msg sys"><div class="bubble">Здравствуйте! Это официальная поддержка EVSA SHOP. Выберите категорию и опишите проблему' + (me ? ' — ответим вам в Telegram.' : '. Войти не обязательно: оставьте контакт (Telegram или e-mail), чтобы мы могли ответить.') + '</div></div>';
+    var srv = srvMsgs(me); if (srv !== null) return sys + srv;
     return sys + guestHist().map(function (g) {
       return '<div class="msg me"><div><div class="tiny muted" style="text-align:right;margin-bottom:3px">' + (me ? esc(me.name) : 'Гость') + ' · <span class="status open" style="font-size:10px;padding:1px 6px">' + esc(g.cat) + '</span> · № ' + esc(g.ticketId) + '</div><div class="bubble">' + esc(g.text) + '</div><div class="time" style="text-align:right">' + U.date(g.at) + ' · ' + U.time(g.at) + ' · отправлено ✓</div></div></div>';
     }).join('');
@@ -217,7 +238,9 @@
             try {
               if (err) { status((err && err.userMessage) || 'Не удалось отправить обращение. Попробуйте позже.', 'bad'); EVSA.sound.error(); return; }
               i.value = ''; try { i.blur(); } catch (x) {}
-              guestPush({ cat: cat, text: text, at: Date.now(), ticketId: t.ticketId }); P.support(el, true);
+              guestPush({ cat: cat, text: text, at: Date.now(), ticketId: t.ticketId });
+              if (srvSup && cur && srvSup.uid === cur.id) srvSup.rows.push({ id: '', category: cat, text: text, kind: 'user', created_at: new Date().toISOString() });
+              P.support(el, true); loadSrvSup(el);
               var box2 = U.$('#msgs', el); if (box2) box2.scrollTop = box2.scrollHeight;
               status('✓ Обращение отправлено в поддержку (№ ' + t.ticketId + ')' + (!cur && !contact ? '. Оставьте контакт, если нужен ответ.' : ''), 'ok'); EVSA.sound.success();
             } catch (x) { status('Обращение отправлено, но страница не обновилась. Обновите её.', 'ok'); }
@@ -231,6 +254,7 @@
       }
       U.$('#supForm', el).onsubmit = onSend;
       U.$('#supBtn', el).onclick = onSend;
+      loadSrvSup(el);
     }
     var box = U.$('#msgs', el); box.scrollTop = box.scrollHeight;
   };

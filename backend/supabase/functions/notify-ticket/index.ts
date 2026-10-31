@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
 
   const db = admin();
   const { data: t } = await db.from('support_tickets').select('*').eq('id', id).maybeSingle();
-  if (!t) return json({ error: 'not found' }, 404);
+  if (!t || t.kind !== 'user') return json({ error: 'not found' }, 404);
   if (t.notified_at || Date.now() - new Date(t.created_at).getTime() > 10 * 60 * 1000) return json({ skipped: 'old' });
   const { data: claimed } = await db.from('support_tickets').update({ notified_at: new Date().toISOString() })
     .eq('id', id).is('notified_at', null).select('id');
@@ -30,6 +30,8 @@ Deno.serve(async (req) => {
     '',
     `ID: ${String(t.id).slice(0, 8)}`,
   ].filter((x, i) => x !== '' || i === 4 || i === 6).join('\n');
-  const r = await tgSend(owner, text);
+  // кнопка открывает переписку в /admin бота (callback обрабатывает только владелец)
+  const key = t.user_id ? String(t.user_id) : 'g' + String(t.id);
+  const r = await tgSend(owner, text, { inline_keyboard: [[{ text: 'Открыть', callback_data: 'adm:sc:' + key }]] });
   return json({ sent: true, ...r });
 });

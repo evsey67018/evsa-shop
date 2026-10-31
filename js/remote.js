@@ -1,8 +1,7 @@
 /* EVSA SHOP — доставка обращений в поддержку.
    Основной путь: таблица support_tickets в Supabase + мгновенное уведомление владельцу в Telegram (функция notify-ticket).
-   Запасной путь (если Supabase недоступен): ntfy.sh, как раньше. Секретов в коде нет. */
+   Если Supabase недоступен — просим написать в Telegram (публичный ntfy.sh убран). Секретов в коде нет. */
 (function () {
-  var ENDPOINT = 'https://ntfy.sh/evsa-support-add6ef5ad50dc4359ba8c6f4';
   var COOLDOWN_MS = 30000, KEY = 'evsa_support_last_sent', TIMEOUT_MS = 15000;
   function cut(s, n) { return String(s == null ? '' : s).replace(/^\s+|\s+$/g, '').slice(0, n); }
   function rid() { return 'ES-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(); }
@@ -17,24 +16,9 @@
   }
   window.EVSA = window.EVSA || {};
   EVSA.remoteSupport = {
-    /* запасной путь: ntfy.sh */
+    /* Supabase недоступен: публичный ntfy.sh больше не используем (его мог читать кто угодно) — просим написать в Telegram. */
     _ntfy: function (t, finish) {
-      try {
-        var x = new XMLHttpRequest();
-          x.open('POST', ENDPOINT, true);
-          x.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
-          x.timeout = TIMEOUT_MS;
-          x.onreadystatechange = function () {
-            if (x.readyState !== 4) return;
-            if (x.status >= 200 && x.status < 300) { lsSet(KEY, String(Date.now())); return finish(null, t); }
-            if (x.status === 0) return finish({ userMessage: 'Не удалось связаться с сервером поддержки. Проверьте интернет и попробуйте снова.' });
-            if (x.status === 429) return finish({ userMessage: 'Слишком много обращений. Попробуйте через минуту.' });
-            finish({ userMessage: 'Сервер поддержки ответил ошибкой (' + x.status + '). Попробуйте позже.' });
-          };
-          x.ontimeout = function () { finish({ userMessage: 'Сервер поддержки не отвечает. Попробуйте ещё раз.' }); };
-          x.onerror = function () { finish({ userMessage: 'Не удалось связаться с сервером поддержки. Проверьте интернет и попробуйте снова.' }); };
-          x.send(JSON.stringify(t));
-      } catch (e) { finish({ userMessage: 'Не удалось отправить обращение: ' + (e && e.message ? e.message : 'ошибка браузера') }); }
+      finish({ userMessage: 'Поддержка временно недоступна. Попробуйте позже или напишите в Telegram ' + ((window.EVSA && EVSA.SUPPORT_TG) || '@evssssa') + '.' });
     },
     MAX_TEXT: 1500,
     cooldownLeft: function () { var t = +lsGet(KEY) || 0; var left = COOLDOWN_MS - (Date.now() - t); return left > 0 && left <= COOLDOWN_MS ? left : 0; },
