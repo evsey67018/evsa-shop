@@ -30,7 +30,7 @@
     chat: function (a) { P.chat(view, a[0]); return 'chats'; },
     support: function () { P.support(view); return 'support'; },
     settings: function () { P.settings(view); return 'settings'; },
-    admin: function (a) { P.admin(view, a[0]); return 'admin'; },
+    admin: function () { location.replace('#/'); return 'home'; },
     favorites: function () { P.favorites(view); return 'favorites'; },
     referral: function () { P.referral(view); return 'referral'; },
     steam: function () { P.steam(view); return 'steam'; },
@@ -63,7 +63,6 @@
     var fb = document.getElementById('fabBadge'); fb.textContent = notif + chats; fb.classList.toggle('on', notif + chats > 0);
     document.getElementById('fabInner').innerHTML = me ? U.avatar(me, 'fab') : '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
     var tl = document.getElementById('topLoginText'); if (tl) tl.textContent = me ? 'Профиль' : 'Войти';
-    var na = document.getElementById('navAdmin'); if (na) na.hidden = !EVSA.settings.get().adminDemo;
   }
 
   /* перерисовка «живых» страниц при изменении данных (новые сообщения, статусы) */

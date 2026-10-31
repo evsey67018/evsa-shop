@@ -9,7 +9,7 @@
   var DAY = 86400000;
 
   /* ---------- настройки ---------- */
-  var defSettings = { theme: 'dark', sound: true, notify: true, dnd: false, adminDemo: false };
+  var defSettings = { theme: 'dark', sound: true, notify: true, dnd: false };
   EVSA.settings = {
     get: function () { try { return Object.assign({}, defSettings, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) { return Object.assign({}, defSettings); } },
     set: function (patch) { var s = Object.assign(this.get(), patch); localStorage.setItem(SKEY, JSON.stringify(s)); return s; }
@@ -81,7 +81,7 @@
   function isBanned(u) { if (!u || !u.ban) return false; if (u.ban.perm) return true; if (u.ban.until > now()) return true; return false; }
   function requireMe() { var u = me(); if (!u) fail('Сначала войдите через Telegram'); return u; }
   function requireActive() { var u = requireMe(); if (isBanned(u)) fail(u.ban.perm ? 'Ваш аккаунт заблокирован навсегда' : 'Ваш аккаунт заблокирован до ' + new Date(u.ban.until).toLocaleString('ru-RU')); return u; }
-  function requireAdmin() { if (!EVSA.settings.get().adminDemo) fail('Доступ только для администратора'); }
+  function requireAdmin() { fail('Доступ только для администратора'); }
   function disc(p) { return p.oldPrice > p.price ? (p.oldPrice - p.price) / p.oldPrice : 0; }
   /* «онлайн»: текущий пользователь и часть демо-продавцов (детерминированно по часу) */
   function isOnline(u) { if (!u) return false; if (u.id === D.currentUserId) return true; return false; }

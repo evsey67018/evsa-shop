@@ -67,7 +67,7 @@ EVSA.findTarget = function (type, id) {
   return (type === 'site' ? EVSA.SITES : EVSA.GAMES).find(function (x) { return x.id === id; }) || null;
 };
 /* Настоящие иконки игр и сервисов лежат локально в assets/icons/<id>.webp (без хотлинка) */
-EVSA.ICON_V = '20261031e';
+EVSA.ICON_V = '20261031f';
 /* Склонение: 1 предложение, 2 предложения, 5 предложений */
 EVSA.plural = function (n, one, few, many) { var a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return many; if (b > 1 && b < 5) return few; if (b === 1) return one; return many; };
 EVSA.offersText = function (n) { return n ? n + ' ' + EVSA.plural(n, 'предложение', 'предложения', 'предложений') : 'Пока нет предложений'; };
