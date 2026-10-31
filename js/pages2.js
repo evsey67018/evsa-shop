@@ -2,7 +2,7 @@
 'use strict';
 (function () {
   var U = EVSA.ui, db = EVSA.db, esc = U.esc, P = EVSA.pages, I = EVSA.icons;
-  var OST = { requested: 'Запрос', completed: 'Завершена', cancelled: 'Отменена' };
+  var OST = { requested: 'Запрос', paid: 'Оплачен', completed: 'Завершена', cancelled: 'Отменена' };
   EVSA.labels = { OST: OST };
 
   /* ================= ПРОФИЛЬ ================= */
@@ -19,9 +19,11 @@
     var body = '';
     if (tab === 'buys' || tab === 'sells') {
       var os = db.ordersOf(me.id, tab === 'sells' ? 'sell' : 'buy');
-      body = os.length ? '<div class="card">' + os.map(function (o) { return '<div class="list-row" style="cursor:pointer" data-href="#/chat/' + o.chatId + '"><div class="grow"><b class="small">' + esc(o.title) + '</b><div class="tiny muted">' + U.dt(o.createdAt) + ' · ' + esc(db.user(tab === 'sells' ? o.buyerId : o.sellerId).name) + '</div></div><span class="status ' + o.status + '">' + (OST[o.status] || o.status) + '</span><b class="small nowrap">' + U.rub(o.price) + '</b>' +
-        (tab === 'buys' && o.status === 'completed' && !o.reviewed ? '<button class="btn sm primary" data-act="review" data-id="' + o.id + '">★ Отзыв</button>' : '') + '</div>'; }).join('') + '</div>' :
-        U.empty(tab === 'buys' ? 'Покупок пока нет' : 'Продаж пока нет', 'Оплата на сайте скоро появится — тогда здесь будут ваши сделки');
+      body = os.length ? '<div class="card">' + os.map(function (o) { return '<div class="list-row" style="cursor:pointer" data-href="#/chat/' + o.chatId + '"><div class="grow"><b class="small">' + esc(o.title) + '</b><div class="tiny muted">#' + esc(o.id.slice(-6)) + ' · ' + U.dt(o.createdAt) + ' · ' + esc(db.user(tab === 'sells' ? o.buyerId : o.sellerId).name) + '</div></div><span class="status ' + o.status + '">' + (OST[o.status] || o.status) + '</span><b class="small nowrap">' + U.rub(o.price) + '</b>' +
+        (tab === 'buys' && o.status === 'paid' ? '<button class="btn sm primary" data-act="confirmOrder" data-id="' + o.id + '">Товар получен</button>' : '') +
+        (tab === 'buys' && o.status === 'completed' && !o.reviewed ? '<button class="btn sm primary" data-act="review" data-id="' + o.id + '">★ Отзыв</button>' : '') + '</div>'; }).join('') + '</div>' +
+        '<div class="tiny muted" style="margin-top:8px">' + (tab === 'buys' ? 'Товар передаёт продавец в чате сделки (нажмите на заказ). ' : 'Передайте товар покупателю в чате сделки (нажмите на заказ). ') + 'Проблема с заказом — <a href="#/support">напишите в поддержку</a> и укажите номер.</div>' :
+        U.empty(tab === 'buys' ? 'Покупок пока нет' : 'Продаж пока нет', tab === 'buys' ? 'Купленные с баланса товары появятся здесь' : 'Здесь появятся заказы на ваши товары');
     }
     if (tab === 'items') { var ps = db.products({ sellerId: me.id, sort: 'new' }); body = ps.length ? '<div class="pgrid">' + ps.map(U.pcard).join('') + '</div>' : P.emptySell('#/sell', 'У вас нет активных объявлений. Выставить товар можно бесплатно'); }
     if (tab === 'topups') {
@@ -154,9 +156,10 @@
       var day = U.date(m.createdAt), sep = day !== prevDay ? '<div class="day-sep"><span>' + day + '</span></div>' : ''; prevDay = day;
       var mine = m.from === me.id, u = db.user(m.from);
       return sep + '<div class="msg ' + (mine ? 'me' : 'them') + (m.pending ? ' pending' : '') + '">' + (mine ? '' : '<span data-href="#/u/' + u.id + '" style="cursor:pointer">' + U.avatar(u, 's') + '</span>') + '<div><div class="bubble">' + esc(m.text) + '</div><div class="time"' + (mine ? ' style="text-align:right"' : '') + '>' + U.time(m.createdAt) + (mine ? (m.pending ? ' · ⏳' : ' · ✓') : '') + '</div></div></div>';
-    }).join('') || '<div class="msg sys"><div class="bubble">Напишите продавцу: уточните детали товара. Не переходите в сторонние мессенджеры и не отправляйте предоплату — оплата на сайте скоро появится.</div></div>';
-    var deal = p ? '<div class="chat-deal"><img src="' + esc(U.pimg(p)) + '" alt="" data-href="#/p/' + p.id + '" style="cursor:pointer"><div class="grow" style="min-width:0"><b class="small clip" style="display:block">' + esc(p.title) + '</b><span class="tiny muted">' + U.rub(o ? o.price : p.price) + (o ? ' · сделка #' + o.id.slice(-6) : '') + '</span></div>' + (o ? '<span class="status ' + o.status + '">' + (OST[o.status] || o.status) + '</span>' : (p.status === 'active' && p.sellerId !== me.id ? '<span class="pill soon">Оплата скоро</span>' : '')) + '</div>' : '';
-    var acts = o && isBuyer && o.status === 'completed' && !o.reviewed ? '<div class="deal-actions"><button class="btn sm primary" data-act="review" data-id="' + o.id + '">★ Оставить отзыв продавцу</button></div>' : '';
+    }).join('') || '<div class="msg sys"><div class="bubble">Напишите продавцу: уточните детали товара. Не переходите в сторонние мессенджеры и не платите продавцу напрямую — покупайте кнопкой «Купить» с баланса сайта.</div></div>';
+    var deal = p ? '<div class="chat-deal"><img src="' + esc(U.pimg(p)) + '" alt="" data-href="#/p/' + p.id + '" style="cursor:pointer"><div class="grow" style="min-width:0"><b class="small clip" style="display:block">' + esc(p.title) + '</b><span class="tiny muted">' + U.rub(o ? o.price : p.price) + (o ? ' · сделка #' + o.id.slice(-6) : '') + '</span></div>' + (o ? '<span class="status ' + o.status + '">' + (OST[o.status] || o.status) + '</span>' : (p.status === 'active' && p.sellerId !== me.id ? '<button class="btn sm primary" data-act="buy" data-id="' + p.id + '">Купить</button>' : '')) + '</div>' : '';
+    var acts = o && isBuyer && o.status === 'paid' ? '<div class="deal-actions"><button class="btn sm primary" data-act="confirmOrder" data-id="' + o.id + '">Товар получен</button><button class="btn sm" data-href="#/support">Проблема с заказом</button></div>' :
+      o && isBuyer && o.status === 'completed' && !o.reviewed ? '<div class="deal-actions"><button class="btn sm primary" data-act="review" data-id="' + o.id + '">★ Оставить отзыв продавцу</button></div>' : '';
     var win = '<div class="chat-head"><button class="icon-btn mobile-back" data-href="#/chats" aria-label="Назад">' + I.back + '</button><span data-href="#/u/' + other.id + '" style="cursor:pointer;min-width:0" class="row">' + U.avatar(other) + '<span style="min-width:0"><b class="clip" style="display:block">' + esc(other.name) + '</b><div class="tiny muted">' + (other.username ? '@' + esc(other.username) : 'профиль') + '</div></span></span></div>' + deal +
       '<div class="msgs" id="msgs">' + msgs + '</div>' + acts;
     var box0 = U.$('#msgs', el), atBottom = !box0 || box0.scrollHeight - box0.scrollTop - box0.clientHeight < 80;
@@ -268,7 +271,7 @@
       '<div class="set-row"><div class="grow"><b>Тема</b><div class="small muted">Сохраняется после перезагрузки</div></div><div class="seg"><button data-theme-set="dark" class="' + (s.theme === 'dark' ? 'active' : '') + '">Тёмная</button><button data-theme-set="light" class="' + (s.theme === 'light' ? 'active' : '') + '">Светлая</button></div></div>' +
       (me ? '<div class="set-row"><div class="grow"><b>Уведомления в Telegram</b><div class="small muted">Бот @' + esc(EVSA.TOPUP.BOT) + ' напишет, когда вам придёт сообщение в чате</div></div><label class="switch"><input type="checkbox" id="setNotify"' + (db.notifyOn() ? ' checked' : '') + '><span></span></label></div>' : '') + '</div>' +
       '<h2 style="margin:22px 0 12px">Аккаунт</h2><div class="card">' + (me ? '<div class="row">' + U.avatar(me, 'l') + '<div class="grow" style="min-width:0"><b class="clip" style="display:block">' + esc(me.name) + '</b><div class="small muted">' + (me.username ? '@' + esc(me.username) : 'username не указан') + (me.tgId ? ' · Telegram ID ' + esc(me.tgId) : '') + '</div><div class="tiny muted">Аккаунт создан ' + U.date(me.createdAt) + '</div></div></div><div class="row wrap" style="margin-top:14px"><button class="btn sm" data-href="#/profile">Открыть профиль</button><button class="btn sm danger" data-act="logout">Выйти</button></div>' : '<div class="row between wrap"><span class="muted">Вы не вошли</span><button class="btn primary sm" data-act="login">' + I.tg + 'Войти через Telegram</button></div>') + '</div>' +
-      '<div class="note small" style="margin-top:18px">Оплата на сайте скоро появится. Пока можно выставлять товары, добавлять их в избранное и переписываться с продавцами.</div></div>';
+      '<div class="note small" style="margin-top:18px">Покупатели оплачивают товары с баланса сайта. О новом заказе придёт уведомление в Telegram-бот — передайте товар покупателю в чате сделки.</div></div>';
     U.$$('[data-set]', el).forEach(function (i) { i.onchange = function () { var p = {}; p[i.dataset.set] = i.checked; EVSA.settings.set(p); EVSA.app.applySettings(); if (i.checked) EVSA.sound.success(); }; });
     var nt = U.$('#setNotify', el);
     if (nt) nt.onchange = function () { var on = nt.checked; nt.disabled = true; db.setNotify(on).then(function () { U.toast(on ? 'Уведомления в Telegram включены' : 'Уведомления в Telegram выключены', 'ok'); }).catch(function (e) { nt.checked = !on; U.err(e); }).then(function () { nt.disabled = false; }); };

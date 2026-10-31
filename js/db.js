@@ -1,7 +1,7 @@
 /* EVSA SHOP — данные в Supabase (общая база для всех пользователей).
    Здесь только публичный anon-ключ: все права проверяются на сервере политиками RLS.
    Баланс пополняется звёздами Telegram (Edge Function create-stars-invoice + бот). Сайт баланс только читает.
-   Покупка товаров пока показывает «Оплата скоро». */
+   Покупка с баланса — только через RPC buy_listing (сервер проверяет цену, баланс, повтор запроса и списывает атомарно). */
 'use strict';
 (function () {
   var SB_URL = 'https://duotcuunusvnxsektzkj.supabase.co';
@@ -66,14 +66,14 @@
     var imgs = r.images || [];
     return { id: r.id, sellerId: r.seller_id, targetType: r.target_type, targetId: r.target_id, category: r.category, title: r.title, desc: r.description,
       buyerMsg: r.buyer_msg || '', delivery: r.delivery, price: Number(r.price), oldPrice: Number(r.old_price) || 0, images: imgs, image: imgs[0] || null,
-      premium: false, status: r.status, sales: r.sales || 0, createdAt: ts(r.created_at) };
+      premium: false, status: r.status, sales: r.sales || 0, qty: r.stock == null ? null : Number(r.stock), createdAt: ts(r.created_at) };
   }
   function mapChat(r) {
     var read = {}; read[r.buyer_id] = ts(r.buyer_read_at); read[r.seller_id] = ts(r.seller_read_at);
     return { id: r.id, a: r.buyer_id, b: r.seller_id, buyerId: r.buyer_id, sellerId: r.seller_id, productId: r.product_id, orderId: null, lastAt: ts(r.last_message_at), readAt: read, unread: {} };
   }
   function mapMsg(r) { return { id: r.id, chatId: r.chat_id, from: r.sender_id, text: r.text, system: false, createdAt: ts(r.created_at) }; }
-  function mapOrder(r) { return { id: r.id, productId: r.product_id, buyerId: r.buyer_id, sellerId: r.seller_id, chatId: r.chat_id, title: r.title, price: Number(r.price), status: r.status, createdAt: ts(r.created_at), completedAt: ts(r.completed_at) }; }
+  function mapOrder(r) { return { id: r.id, productId: r.product_id, buyerId: r.buyer_id, sellerId: r.seller_id, chatId: r.chat_id, title: r.title, price: Number(r.price), status: r.status, createdAt: ts(r.created_at), paidAt: ts(r.paid_at), completedAt: ts(r.completed_at) }; }
   function mapReview(r) { return { id: r.id, orderId: r.order_id, productId: r.product_id, sellerId: r.seller_id, buyerId: r.buyer_id, rating: r.rating, text: r.text, createdAt: ts(r.created_at) }; }
 
   function computeUnread() {
@@ -161,6 +161,10 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets', filter: 'user_id=eq.' + uidMe }, function (p) {
         if (!p.new || p.new.user_id !== uidMe) return;
         C.balance = Number(p.new.balance) || 0; C.unlimited = !!p.new.unlimited; loadWallet().then(function () { emit(true); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, function (p) {
+        if (!p.new || !p.new.id) return; upsert(C.orders, mapOrder(p.new)); computeUnread();
+        ensureUsers([p.new.buyer_id, p.new.seller_id]).then(function () { emit(true); });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, function (p) {
         if (!p.new || !p.new.id) return; upsert(C.chats, mapChat(p.new)); computeUnread();
@@ -345,10 +349,42 @@
     },
 
     /* --- покупки: оплата пока отключена --- */
-    PAYMENTS: false,
-    buy: function () { return Promise.reject(err('Оплата скоро. Пока напишите продавцу в чат')); },
+    PAYMENTS: true,
+    newRequestId: function () { return uuid(); },
+    /* reqId — один на открытое окно подтверждения: повторный клик не спишет деньги второй раз */
+    buy: function (pid, reqId) {
+      return once('buy', function () {
+        var u = requireActive(), p = product(pid);
+        if (!p) fail('Товар не найден');
+        if (p.sellerId === u.id) fail('Это ваш товар');
+        if (p.status !== 'active') fail('Товар уже недоступен');
+        return sb.rpc('buy_listing', { p_product_id: p.id, p_expected_price: p.price, p_request_id: reqId }).then(function (r) {
+          if (r.error) {
+            var m = String(r.error.message || ''), map = { not_signed_in: 'Войдите, чтобы купить', banned: 'Ваш аккаунт заблокирован', not_found: 'Товар не найден',
+              not_active: 'Товар уже продан или снят с продажи', own_listing: 'Это ваш товар', seller_banned: 'Продавец заблокирован — покупка недоступна',
+              price_changed: 'Цена товара изменилась — проверьте новую цену', out_of_stock: 'Товар закончился', bad_request: 'Ошибка запроса, обновите страницу' };
+            var k = Object.keys(map).find(function (x) { return m.indexOf(x) >= 0; });
+            if (k === 'price_changed' || k === 'not_active' || k === 'out_of_stock') loadPublic().then(function () { emit(true); });
+            throw k ? err(map[k]) : dbErr(r.error, 'Не удалось оплатить. Деньги не списаны — попробуйте ещё раз');
+          }
+          var d = r.data || {};
+          if (d.status === 'insufficient') { var e = err('Недостаточно средств'); e.code = 'insufficient'; e.need = Number(d.price) - Number(d.balance || 0); return Promise.reject(e); }
+          if (d.status !== 'ok' && d.status !== 'duplicate') fail('Не удалось оплатить');
+          return Promise.all([loadPrivate(), loadPublic()]).then(function () { emit(true); return d; });
+        });
+      });
+    },
+    confirmOrder: function (id) {
+      return once('confirm', function () {
+        requireActive();
+        return sb.rpc('order_confirm', { p_order_id: id }).then(function (r) {
+          if (r.error) throw dbErr(r.error, 'Не удалось подтвердить получение');
+          return loadPrivate().then(function () { emit(true); });
+        });
+      });
+    },
     order: function (id) { return C.orders.find(function (o) { return o.id === id; }) || null; },
-    ordersOf: function (u, role) { return C.orders.filter(function (o) { return role === 'sell' ? o.sellerId === u : o.buyerId === u; }).map(function (o) { o.reviewed = C.reviews.some(function (r) { return r.orderId === o.id; }); return o; }); },
+    ordersOf: function (u, role) { return C.orders.filter(function (o) { return role === 'sell' ? o.sellerId === u : o.buyerId === u; }).sort(function (a, b) { return b.createdAt - a.createdAt; }).map(function (o) { o.reviewed = C.reviews.some(function (r) { return r.orderId === o.id; }); return o; }); },
     review: function (orderId, rating, text) {
       return once('review', function () {
         var u = requireActive(), o = EVSA.db.order(orderId);

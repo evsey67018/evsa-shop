@@ -125,7 +125,9 @@
         });
       case 'clearViewed': db.clearViewed(); return render(true);
       case 'report': if (!need()) return; return reportModal(id);
-      case 'buy': case 'buyCart': return soonModal(a === 'buy' ? id : null);
+      case 'buy': if (!need()) return; return buyModal(id);
+      case 'buyCart': return U.toast('Оплачивайте товары по одному — кнопка «Купить» у каждого товара');
+      case 'confirmOrder': return confirmModal('Подтвердить получение?', 'Подтверждайте, только если продавец передал товар и всё работает. После подтверждения сделка завершится и можно оставить отзыв.', 'Товар получен', function () { return db.confirmOrder(id).then(function () { EVSA.sound.success(); U.toast('Сделка завершена — оставьте отзыв продавцу', 'ok'); }); });
       case 'cartAdd': if (!need()) return; return U.try(function () { db.cartAdd(id); EVSA.sound.success(); U.toast('Добавлено в корзину', 'ok', '#/cart'); });
       case 'cartRemove': return U.try(function () { db.cartRemove(id); render(true); });
       case 'chatSeller': if (!need()) return; return U.try(function () { return U.busy(el, db.openChat(id)).then(function (c) { if (c) location.hash = '#/chat/' + c.id; }); });
@@ -185,13 +187,45 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden) resumeLogin(); });
   window.addEventListener('focus', resumeLogin);
 
-  /* ---- покупка: оплата пока недоступна ---- */
-  function soonModal(pid) {
-    var p = pid ? db.product(pid) : null;
-    var b = U.modal('Оплата скоро', '<div class="stack">' + (p ? '<div class="row"><img src="' + esc(U.pimg(p)) + '" alt="" style="width:84px;height:54px;object-fit:cover;border-radius:10px"><div class="grow"><b class="small">' + esc(p.title) + '</b><div class="tiny muted">' + U.rub(p.price) + ' · ' + esc(db.user(p.sellerId).name) + '</div></div></div>' : '') +
-      '<div class="note small">Оплата на сайте ещё не подключена. Пока можно написать продавцу и договориться — когда появится безопасная сделка, мы сообщим.</div>' +
-      (p && (!db.me() || db.me().id !== p.sellerId) ? '<button class="btn primary block" data-act="chatSeller" data-id="' + p.id + '">' + I.chat + 'Написать продавцу</button>' : '') +
-      '<button class="btn block ghost" data-close>Понятно</button></div>');
+  /* ---- покупка с баланса: подтверждение → RPC buy_listing (атомарно на сервере) ---- */
+  function buyModal(pid) {
+    var p = db.product(pid), me = db.me();
+    if (!p) return U.toast('Товар не найден', 'bad');
+    if (me && me.id === p.sellerId) return U.toast('Это ваш товар', 'bad');
+    if (p.status !== 'active') return U.toast('Товар уже недоступен', 'bad');
+    var reqId = db.newRequestId(); // один id на это окно: двойной клик не спишет дважды
+    var unl = db.unlimited(), bal = db.balance(), enough = unl || bal >= p.price;
+    var b = U.modal('Покупка', '<div class="stack">' +
+      '<div class="row"><img src="' + esc(U.pimg(p)) + '" alt="" style="width:84px;height:54px;object-fit:cover;border-radius:10px"><div class="grow" style="min-width:0"><b class="small">' + esc(p.title) + '</b><div class="tiny muted">Продавец: ' + esc(db.user(p.sellerId).name) + '</div></div></div>' +
+      '<div class="card" style="margin:0"><div class="row between"><span class="muted">Цена</span><b>' + U.rub(p.price) + '</b></div>' +
+      '<div class="row between" style="margin-top:6px"><span class="muted">Ваш баланс</span><b>' + (unl ? '∞' : U.rub(bal)) + '</b></div>' +
+      (unl ? '' : '<div class="row between" style="margin-top:6px"><span class="muted">После покупки</span><b' + (enough ? '' : ' style="color:#f87171"') + '>' + (enough ? U.rub(bal - p.price) : 'не хватает ' + U.rub(p.price - bal)) + '</b></div>') + '</div>' +
+      '<div class="note small">Деньги спишутся с баланса сайта. Продавец передаст товар в чате сделки — после получения нажмите «Товар получен». Проблема с заказом — напишите в поддержку.</div>' +
+      '<div class="err" id="byErr" role="alert"></div>' +
+      (enough ? '<button class="btn primary block lg" id="byGo">Оплатить ' + U.rub(p.price) + '</button>' :
+        '<button class="btn primary block lg" id="byTop">' + I.plus + 'Недостаточно средств — пополнить</button>') +
+      '<button class="btn block ghost" data-close>Отмена</button></div>');
+    var top = U.$('#byTop', b); if (top) top.onclick = function () { depositModal(p.price - bal); };
+    var go = U.$('#byGo', b); if (!go) return;
+    go.onclick = function () {
+      var errBox = U.$('#byErr', b); errBox.textContent = '';
+      U.busy(go, db.buy(p.id, reqId)).then(function (d) {
+        EVSA.sound.success();
+        U.modal('Оплачено ✅', '<div class="stack"><p style="margin:0">Заказ <b>#' + esc(String(d.order_id).slice(-6)) + '</b> «' + esc(p.title) + '» оплачен: ' + U.rub(d.price) + '.</p>' +
+          '<div class="note small">Продавец получил уведомление и передаст товар в чате сделки. Если что-то пошло не так — напишите в поддержку.</div>' +
+          (d.unlimited ? '' : '<div class="small muted">Баланс: ' + U.rub(d.balance) + '</div>') +
+          (d.chat_id ? '<button class="btn primary block" data-href="#/chat/' + esc(d.chat_id) + '" data-close>' + I.chat + 'Открыть чат сделки</button>' : '') +
+          '<button class="btn block" data-href="#/profile/buys" data-close>Мои покупки</button></div>');
+      }).catch(function (e) {
+        EVSA.sound.error();
+        if (e && e.code === 'insufficient') {
+          errBox.innerHTML = 'Недостаточно средств. <a href="#" id="byTop2">Пополнить</a>';
+          U.$('#byTop2', b).onclick = function (ev) { ev.preventDefault(); depositModal(e.need > 0 ? e.need : p.price); };
+          return;
+        }
+        errBox.textContent = (e && e.userMessage) || 'Не удалось оплатить. Попробуйте ещё раз';
+      });
+    };
   }
 
   /* ---- отзывы ---- */
