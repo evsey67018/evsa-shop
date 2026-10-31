@@ -220,6 +220,7 @@
     var start = need ? Math.min(T.MAX, Math.max(T.MIN, Math.ceil(need))) : 100;
     stopPayPoll();
     var b = U.modal('Пополнение баланса', '<div class="stack">' +
+      (db.unlimited() ? '<div class="note small">Ваш баланс: <b>∞</b> (безлимитный). Пополнять не нужно, но пополнение работает как обычно.</div>' : '') +
       '<div class="note small">Оплата звёздами Telegram. Звёзд нужно на ' + Math.round(T.DISCOUNT * 100) + '% меньше, чем рублей: 100 ₽ = ' + EVSA.topupStars(100) + ' ⭐. На баланс придёт вся сумма в рублях.</div>' +
       '<label class="field">Сумма пополнения, ₽<input class="input" id="dSum" type="number" inputmode="numeric" min="' + T.MIN + '" max="' + T.MAX + '" step="1" value="' + start + '"></label>' +
       '<div class="amounts" style="grid-template-columns:repeat(4,1fr)">' + [100, 200, 500, 1000].map(function (x) { return '<button type="button" class="btn sm" data-s="' + x + '">' + x + '\u00a0₽</button>'; }).join('') + '</div>' +

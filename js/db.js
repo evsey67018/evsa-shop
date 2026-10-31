@@ -26,11 +26,11 @@
   EVSA.sb = sb;
 
   /* ---------- кэш ---------- */
-  var C = { users: [], products: [], reviews: [], favs: [], chats: [], messages: [], orders: [], settings: null, tgId: null, balance: 0, topups: [] };
+  var C = { users: [], products: [], reviews: [], favs: [], chats: [], messages: [], orders: [], settings: null, tgId: null, balance: 0, unlimited: false, topups: [] };
   var uidMe = null, ready = false, listeners = [], sig = '';
   function emit(force) {
     var s = [C.products.length, C.users.length, C.reviews.length, C.favs.length, C.chats.length, C.messages.length, C.orders.length, uidMe,
-      C.chats.reduce(function (a, c) { return a + c.lastAt + (c.unread[uidMe] || 0); }, 0), C.products.reduce(function (a, p) { return a + p.status.length + p.price; }, 0), C.balance, C.topups.length].join('|');
+      C.chats.reduce(function (a, c) { return a + c.lastAt + (c.unread[uidMe] || 0); }, 0), C.products.reduce(function (a, p) { return a + p.status.length + p.price; }, 0), C.balance, C.unlimited, C.topups.length].join('|');
     if (!force && s === sig) return; sig = s;
     listeners.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
   }
@@ -97,18 +97,18 @@
       C.products = ps.map(mapProduct); C.users = us.map(mapUser); C.reviews = rv.map(mapReview);
     });
   }
-  function clearPrivate() { C.favs = []; C.chats = []; C.messages = []; C.orders = []; C.settings = null; C.tgId = null; C.balance = 0; C.topups = []; }
+  function clearPrivate() { C.favs = []; C.chats = []; C.messages = []; C.orders = []; C.settings = null; C.tgId = null; C.balance = 0; C.unlimited = false; C.topups = []; }
   function mapTopup(r) { return { id: r.id, rub: Number(r.amount_rub), stars: r.stars, status: r.status, createdAt: ts(r.created_at), paidAt: ts(r.paid_at) }; }
   /* баланс и пополнения: только чтение (RLS — свои строки). Ошибка не ломает остальную загрузку. */
   function loadWallet() {
     if (!uidMe) return Promise.resolve();
     var me = uidMe;
     return Promise.all([
-      sb.from('wallets').select('balance').maybeSingle(),
+      sb.from('wallets').select('balance,unlimited').maybeSingle(),
       sb.from('star_payments').select('id,amount_rub,stars,status,created_at,paid_at').eq('status', 'paid').order('paid_at', { ascending: false }).limit(50)
     ]).then(function (rs) {
       if (me !== uidMe) return;
-      if (!rs[0].error) C.balance = rs[0].data ? Number(rs[0].data.balance) || 0 : 0;
+      if (!rs[0].error) { C.balance = rs[0].data ? Number(rs[0].data.balance) || 0 : 0; C.unlimited = !!(rs[0].data && rs[0].data.unlimited); }
       if (!rs[1].error) C.topups = (rs[1].data || []).map(mapTopup);
     }).catch(function (e) { console.warn(e); });
   }
@@ -160,7 +160,7 @@
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets', filter: 'user_id=eq.' + uidMe }, function (p) {
         if (!p.new || p.new.user_id !== uidMe) return;
-        C.balance = Number(p.new.balance) || 0; loadWallet().then(function () { emit(true); });
+        C.balance = Number(p.new.balance) || 0; C.unlimited = !!p.new.unlimited; loadWallet().then(function () { emit(true); });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, function (p) {
         if (!p.new || !p.new.id) return; upsert(C.chats, mapChat(p.new)); computeUnread();
@@ -440,6 +440,8 @@
        Сайт только просит сервер выставить счёт. Зачисляет деньги бот после оплаты (service role). */
     starsQuote: function (rub) { rub = Number(rub); return { rub: rub, stars: EVSA.topupStars(rub) }; },
     balance: function () { return C.balance; },
+    /* безлимитный баланс (∞): флаг ставится только на сервере, расходы его не уменьшают */
+    unlimited: function () { return C.unlimited; },
     topups: function () { return C.topups; },
     refreshWallet: function () { var b = C.balance; return loadWallet().then(function () { emit(); return { balance: C.balance, delta: C.balance - b }; }); },
     /* → {url, amount, stars}: ссылка на счёт в Telegram Stars */

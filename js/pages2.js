@@ -34,7 +34,7 @@
       '<div class="prof-top"><label class="ava-edit" title="Обновить аватарку">' + U.avatar(me, 'xl') + '<span class="ava-cam">' + I.plus + '</span><input type="file" accept="image/jpeg,image/png,image/webp" id="avaFile" hidden></label><div class="grow" style="min-width:0"><h1 class="clip">' + esc(me.name) + '</h1>' +
       '<div class="muted">' + (me.username ? '@' + esc(me.username) : 'username не указан') + '</div>' + (me.tgId ? '<div class="tiny muted">Telegram ID: ' + esc(me.tgId) + '</div>' : '') +
       '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' ' + EVSA.plural(st.count, 'отзыв', 'отзыва', 'отзывов') + '</div></div></div>' +
-      '<div class="balance-box"><div class="grow" style="min-width:0"><div class="muted small">Баланс</div><b>' + U.rub(db.balance()) + '</b></div>' +
+      '<div class="balance-box"><div class="grow" style="min-width:0"><div class="muted small">Баланс</div><b>' + (db.unlimited() ? '<span title="Безлимитный баланс">∞</span>' : U.rub(db.balance())) + '</b></div>' +
       (banned ? '' : '<button class="btn primary" data-act="deposit">' + I.plus + 'Пополнить</button>') + '</div>' +
       '<div class="prof-actions"><button class="btn cyan" data-href="#/sell">' + I.plus + 'Продать</button><button class="btn" data-href="#/chats">' + PL_ICO.chat + 'Чаты</button><button class="btn" data-href="#/favorites">' + PL_ICO.heart + 'Избранное</button></div>' +
       '<div class="tabs">' + tabs.map(function (x) { return '<button class="tab' + (x[0] === tab ? ' active' : '') + '" data-href="#/profile/' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><div class="tab-body">' + body + '</div>' +
