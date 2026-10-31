@@ -13,7 +13,7 @@
   P.profile = function (el, tab) {
     var me = db.me();
     if (!me) return P.needLogin(el, 'Профиль');
-    var tabs = [['items', 'Мои товары'], ['reviews', 'Отзывы'], ['buys', 'Покупки'], ['sells', 'Продажи']];
+    var tabs = [['items', 'Мои товары'], ['reviews', 'Отзывы'], ['buys', 'Покупки'], ['sells', 'Продажи'], ['topups', 'Пополнения']];
     if (!tabs.some(function (x) { return x[0] === tab; })) tab = 'items';
     var st = db.sellerStats(me.id), banned = db.isBanned(me);
     var body = '';
@@ -24,11 +24,18 @@
         U.empty(tab === 'buys' ? 'Покупок пока нет' : 'Продаж пока нет', 'Оплата на сайте скоро появится — тогда здесь будут ваши сделки');
     }
     if (tab === 'items') { var ps = db.products({ sellerId: me.id, sort: 'new' }); body = ps.length ? '<div class="pgrid">' + ps.map(U.pcard).join('') + '</div>' : P.emptySell('#/sell', 'У вас нет активных объявлений. Выставить товар можно бесплатно'); }
+    if (tab === 'topups') {
+      var tp = db.topups();
+      body = tp.length ? '<div class="card">' + tp.map(function (t) { return '<div class="list-row"><div class="grow"><b class="small">Пополнение звёздами</b><div class="tiny muted">' + U.dt(t.paidAt || t.createdAt) + ' · ' + t.stars + ' ⭐</div></div><span class="status completed">Зачислено</span><b class="small nowrap">+' + U.rub(t.rub) + '</b></div>'; }).join('') + '</div>' :
+        U.empty('Пополнений пока нет', 'Пополните баланс звёздами Telegram — кнопка «Пополнить» выше');
+    }
     if (tab === 'reviews') { var rv = db.reviewsFor(me.id); body = rv.length ? '<div class="card">' + rv.map(P.reviewHtml).join('') + '</div>' : U.empty('Отзывов пока нет', 'Отзывы оставляют покупатели после завершённой сделки'); }
     el.innerHTML = '<div class="page" style="max-width:860px"><div class="card prof-card">' + (banned ? '<div class="note bad" style="margin-bottom:14px">Аккаунт заблокирован. Покупки, продажи и чаты недоступны. Вы можете написать в поддержку.</div>' : '') +
       '<div class="prof-top"><label class="ava-edit" title="Обновить аватарку">' + U.avatar(me, 'xl') + '<span class="ava-cam">' + I.plus + '</span><input type="file" accept="image/jpeg,image/png,image/webp" id="avaFile" hidden></label><div class="grow" style="min-width:0"><h1 class="clip">' + esc(me.name) + '</h1>' +
       '<div class="muted">' + (me.username ? '@' + esc(me.username) : 'username не указан') + '</div>' + (me.tgId ? '<div class="tiny muted">Telegram ID: ' + esc(me.tgId) + '</div>' : '') +
       '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' ' + EVSA.plural(st.count, 'отзыв', 'отзыва', 'отзывов') + '</div></div></div>' +
+      '<div class="balance-box"><div class="grow" style="min-width:0"><div class="muted small">Баланс</div><b>' + U.rub(db.balance()) + '</b></div>' +
+      (banned ? '' : '<button class="btn primary" data-act="deposit">' + I.plus + 'Пополнить</button>') + '</div>' +
       '<div class="prof-actions"><button class="btn cyan" data-href="#/sell">' + I.plus + 'Продать</button><button class="btn" data-href="#/chats">' + PL_ICO.chat + 'Чаты</button><button class="btn" data-href="#/favorites">' + PL_ICO.heart + 'Избранное</button></div>' +
       '<div class="tabs">' + tabs.map(function (x) { return '<button class="tab' + (x[0] === tab ? ' active' : '') + '" data-href="#/profile/' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><div class="tab-body">' + body + '</div>' +
       '<div class="row wrap prof-foot"><button class="btn sm" data-act="login">' + I.tg + 'Обновить данные из Telegram</button><button class="btn sm danger" data-act="logout">Выйти</button></div></div></div>';

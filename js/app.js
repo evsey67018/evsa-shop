@@ -210,19 +210,25 @@
     go.onclick = function () { U.try(function () { return U.busy(go, db.sendSupport('Жалоба на продавца', 'Жалоба на товар «' + p.title + '» (#' + p.id.slice(0, 8) + ', продавец ' + db.user(p.sellerId).name + '): ' + U.$('#rpR', b).value + '. ' + U.$('#rpT', b).value)).then(function () { U.closeModal(); EVSA.sound.success(); U.toast('Жалоба отправлена в поддержку', 'ok'); }); }); };
   }
 
-  /* ---- пополнение: через Telegram-бота (ссылка t.me/<бот>?start=topup_<сумма>), оплата скоро ---- */
+  /* ---- пополнение баланса звёздами Telegram ----
+     Сервер (create-stars-invoice) выставляет счёт на round(сумма * 0.8) ⭐ и присылает его в бота.
+     Баланс зачисляет бот после оплаты; сайт только ждёт обновления баланса. */
+  var payTimer = null;
+  function stopPayPoll() { clearTimeout(payTimer); payTimer = null; }
   function depositModal(need) {
     var T = EVSA.TOPUP;
     var start = need ? Math.min(T.MAX, Math.max(T.MIN, Math.ceil(need))) : 100;
-    var b = U.modal('Пополнение баланса <span class="pill soon">Оплата скоро</span>', '<div class="stack">' +
-      '<div class="note small">Оплата звёздами Telegram ещё не подключена — бот покажет сумму, но списаний сейчас нет.</div>' +
+    stopPayPoll();
+    var b = U.modal('Пополнение баланса', '<div class="stack">' +
+      '<div class="note small">Оплата звёздами Telegram. Звёзд нужно на ' + Math.round(T.DISCOUNT * 100) + '% меньше, чем рублей: 100 ₽ = ' + EVSA.topupStars(100) + ' ⭐. На баланс придёт вся сумма в рублях.</div>' +
       '<label class="field">Сумма пополнения, ₽<input class="input" id="dSum" type="number" inputmode="numeric" min="' + T.MIN + '" max="' + T.MAX + '" step="1" value="' + start + '"></label>' +
       '<div class="amounts" style="grid-template-columns:repeat(4,1fr)">' + [100, 200, 500, 1000].map(function (x) { return '<button type="button" class="btn sm" data-s="' + x + '">' + x + '\u00a0₽</button>'; }).join('') + '</div>' +
       '<div class="topup-quote"><span class="muted small">К оплате звёздами<br><span class="tiny">скидка ' + Math.round(T.DISCOUNT * 100) + '%</span></span><b id="dStars"></b></div>' +
       '<div class="err" id="dErr" role="alert"></div>' +
-      '<a class="btn primary block tg-pay" id="dGo" href="#" target="_blank" rel="noopener">' + I.tg + 'Открыть бота</a>' +
-      '<div class="tiny muted">Откроется бот @' + esc(T.BOT) + '.</div></div>');
-    var s = U.$('#dSum', b), go = U.$('#dGo', b), errBox = U.$('#dErr', b);
+      '<a class="btn primary block tg-pay" id="dGo" href="#" target="_blank" rel="noopener">' + I.tg + '<span>Пополнить</span></a>' +
+      '<div class="login-wait tiny muted" id="dWait" hidden><span class="spin"></span>Ждём оплату в Telegram… Баланс обновится сам.</div>' +
+      '<div class="tiny muted">Счёт откроется в Telegram и придёт в бота @' + esc(T.BOT) + '. От ' + T.MIN + ' до ' + T.MAX.toLocaleString('ru-RU') + ' ₽.</div></div>');
+    var s = U.$('#dSum', b), go = U.$('#dGo', b), errBox = U.$('#dErr', b), wait = U.$('#dWait', b), invoice = null;
     function amount() { return Number(String(s.value).replace(',', '.')); }
     function check() {
       var v = amount();
@@ -231,17 +237,54 @@
       if (v < T.MIN || v > T.MAX) return 'Сумма пополнения: от ' + T.MIN + ' до ' + T.MAX.toLocaleString('ru-RU') + ' ₽';
       return '';
     }
-    function q() { var e = check(); U.$('#dStars', b).textContent = e ? '—' : db.starsQuote(amount()).stars + ' ⭐'; go.href = e ? '#' : EVSA.topupLink(amount()); if (!e) errBox.textContent = ''; }
+    function q() {
+      var e = check(); U.$('#dStars', b).textContent = e ? '—' : db.starsQuote(amount()).stars + ' ⭐';
+      if (!e) errBox.textContent = '';
+      if (invoice && invoice.amount !== amount()) { invoice = null; go.href = '#'; go.lastChild.textContent = 'Пополнить'; }
+    }
     s.oninput = q; q();
     U.$$('[data-s]', b).forEach(function (x) { x.onclick = function () { s.value = x.dataset.s; q(); }; });
-    go.onclick = function (ev) {
-      var e = check();
-      if (e) { ev.preventDefault(); errBox.textContent = e; EVSA.sound.error(); return false; }
+    function openInvoice(url, win) {
       var tg = window.Telegram && window.Telegram.WebApp;
-      if (tg && tg.openTelegramLink && tg.initData) { ev.preventDefault(); tg.openTelegramLink(EVSA.topupLink(amount())); }
-      return true;
+      if (tg && tg.initData && tg.openInvoice) { tg.openInvoice(url, function (st) { if (st === 'paid') db.refreshWallet(); }); return; }
+      if (tg && tg.initData && tg.openTelegramLink) return tg.openTelegramLink(url);
+      if (win && !win.closed) win.location.href = url; else location.href = url;
+    }
+    go.onclick = function (ev) {
+      ev.preventDefault();
+      var e = check();
+      if (e) { errBox.textContent = e; EVSA.sound.error(); return false; }
+      if (invoice) { openInvoice(invoice.url, null); return false; } // тот же счёт ещё раз
+      var tg = window.Telegram && window.Telegram.WebApp, win = null;
+      if (!(tg && tg.initData)) { try { win = window.open('about:blank', '_blank'); } catch (x) { win = null; } }
+      var bal0 = db.balance();
+      U.busy(go, db.createStarsInvoice(amount())).then(function (r) {
+        invoice = { url: r.url, amount: r.amount };
+        openInvoice(r.url, win);
+        go.href = r.url; go.lastChild.textContent = 'Открыть счёт ещё раз (' + r.stars + ' ⭐)';
+        wait.hidden = false; pollPay(bal0, b, 0);
+      }).catch(function (x) { if (win) try { win.close(); } catch (y) {} errBox.textContent = x.userMessage || 'Не удалось создать счёт'; EVSA.sound.error(); });
+      return false;
     };
   }
+  /* ждём зачисления (~10 минут); realtime обычно обновляет баланс раньше */
+  function pollPay(bal0, box, tries) {
+    stopPayPoll();
+    if (tries > 200) return;
+    payTimer = setTimeout(function () {
+      db.refreshWallet().then(function () {
+        var got = db.balance() - bal0;
+        if (got > 0) {
+          stopPayPoll(); EVSA.sound.success();
+          U.toast('Баланс пополнен на ' + U.rub(got), 'ok', '#/profile');
+          if (box && box.isConnected) U.closeModal();
+          render(true); return;
+        }
+        if (box && box.isConnected) pollPay(bal0, box, tries + 1); else if (tries < 100) pollPay(bal0, null, tries + 1);
+      }).catch(function () { pollPay(bal0, box, tries + 1); });
+    }, 3000);
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && db.me()) db.refreshWallet().catch(function () {}); });
 
   /* ---------- настройки и тема ---------- */
   EVSA.app = {

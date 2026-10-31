@@ -1,6 +1,7 @@
 /* EVSA SHOP — данные в Supabase (общая база для всех пользователей).
    Здесь только публичный anon-ключ: все права проверяются на сервере политиками RLS.
-   Оплаты и балансов нет — покупка показывает «Оплата скоро». */
+   Баланс пополняется звёздами Telegram (Edge Function create-stars-invoice + бот). Сайт баланс только читает.
+   Покупка товаров пока показывает «Оплата скоро». */
 'use strict';
 (function () {
   var SB_URL = 'https://duotcuunusvnxsektzkj.supabase.co';
@@ -25,11 +26,11 @@
   EVSA.sb = sb;
 
   /* ---------- кэш ---------- */
-  var C = { users: [], products: [], reviews: [], favs: [], chats: [], messages: [], orders: [], settings: null, tgId: null };
+  var C = { users: [], products: [], reviews: [], favs: [], chats: [], messages: [], orders: [], settings: null, tgId: null, balance: 0, topups: [] };
   var uidMe = null, ready = false, listeners = [], sig = '';
   function emit(force) {
     var s = [C.products.length, C.users.length, C.reviews.length, C.favs.length, C.chats.length, C.messages.length, C.orders.length, uidMe,
-      C.chats.reduce(function (a, c) { return a + c.lastAt + (c.unread[uidMe] || 0); }, 0), C.products.reduce(function (a, p) { return a + p.status.length + p.price; }, 0)].join('|');
+      C.chats.reduce(function (a, c) { return a + c.lastAt + (c.unread[uidMe] || 0); }, 0), C.products.reduce(function (a, p) { return a + p.status.length + p.price; }, 0), C.balance, C.topups.length].join('|');
     if (!force && s === sig) return; sig = s;
     listeners.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
   }
@@ -96,7 +97,21 @@
       C.products = ps.map(mapProduct); C.users = us.map(mapUser); C.reviews = rv.map(mapReview);
     });
   }
-  function clearPrivate() { C.favs = []; C.chats = []; C.messages = []; C.orders = []; C.settings = null; C.tgId = null; }
+  function clearPrivate() { C.favs = []; C.chats = []; C.messages = []; C.orders = []; C.settings = null; C.tgId = null; C.balance = 0; C.topups = []; }
+  function mapTopup(r) { return { id: r.id, rub: Number(r.amount_rub), stars: r.stars, status: r.status, createdAt: ts(r.created_at), paidAt: ts(r.paid_at) }; }
+  /* баланс и пополнения: только чтение (RLS — свои строки). Ошибка не ломает остальную загрузку. */
+  function loadWallet() {
+    if (!uidMe) return Promise.resolve();
+    var me = uidMe;
+    return Promise.all([
+      sb.from('wallets').select('balance').maybeSingle(),
+      sb.from('star_payments').select('id,amount_rub,stars,status,created_at,paid_at').eq('status', 'paid').order('paid_at', { ascending: false }).limit(50)
+    ]).then(function (rs) {
+      if (me !== uidMe) return;
+      if (!rs[0].error) C.balance = rs[0].data ? Number(rs[0].data.balance) || 0 : 0;
+      if (!rs[1].error) C.topups = (rs[1].data || []).map(mapTopup);
+    }).catch(function (e) { console.warn(e); });
+  }
   function loadPrivate() {
     if (!uidMe) { clearPrivate(); return Promise.resolve(); }
     var me = uidMe;
@@ -114,7 +129,7 @@
       C.settings = rs[4].data || null; C.tgId = rs[5].data || null;
       C.users.forEach(function (u) { if (u.id === uidMe) u.tgId = C.tgId; });
       computeUnread();
-    });
+    }).then(loadWallet);
   }
   /* лёгкое обновление чатов (на случай, если realtime недоступен) */
   function refreshChats() {
@@ -142,6 +157,10 @@
         var c = C.chats.find(function (x) { return x.id === m.chatId; }); if (c) c.lastAt = Math.max(c.lastAt, m.createdAt);
         computeUnread(); ensureUsers([m.from]).then(function () { emit(); });
         if (m.from !== uidMe && EVSA.sound && EVSA.sound.message) try { EVSA.sound.message(); } catch (e) {}
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets', filter: 'user_id=eq.' + uidMe }, function (p) {
+        if (!p.new || p.new.user_id !== uidMe) return;
+        C.balance = Number(p.new.balance) || 0; loadWallet().then(function () { emit(true); });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, function (p) {
         if (!p.new || !p.new.id) return; upsert(C.chats, mapChat(p.new)); computeUnread();
@@ -187,6 +206,13 @@
       if (blob.size > 2 * 1024 * 1024) throw err('Фото слишком большое после сжатия (макс. 2 МБ)');
       return sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: false });
     }).then(function (r) { if (r.error) throw dbErr(r.error, 'Не удалось загрузить фото'); return SB_URL + '/storage/v1/object/public/' + BUCKET + '/' + path; });
+  }
+
+  /* ошибка Edge Function: берём понятный текст из ответа сервера ({message}) */
+  function fnErr(e, fallback) {
+    var ctx = e && e.context;
+    if (ctx && typeof ctx.json === 'function') return ctx.json().then(function (b) { return err(b && b.message ? String(b.message) : fallback); }, function () { return dbErr(e, fallback); });
+    return Promise.resolve(dbErr(e, fallback));
   }
 
   /* ---------- вход через Telegram-бота ---------- */
@@ -410,8 +436,26 @@
     ticketsOf: function () { return []; },
     markSupportRead: function () {},
 
-    /* --- пополнение (через бота, оплата скоро) --- */
+    /* --- баланс и пополнение звёздами Telegram ---
+       Сайт только просит сервер выставить счёт. Зачисляет деньги бот после оплаты (service role). */
     starsQuote: function (rub) { rub = Number(rub); return { rub: rub, stars: EVSA.topupStars(rub) }; },
+    balance: function () { return C.balance; },
+    topups: function () { return C.topups; },
+    refreshWallet: function () { var b = C.balance; return loadWallet().then(function () { emit(); return { balance: C.balance, delta: C.balance - b }; }); },
+    /* → {url, amount, stars}: ссылка на счёт в Telegram Stars */
+    createStarsInvoice: function (rub) {
+      return once('stars', function () {
+        requireActive();
+        var T = EVSA.TOPUP; rub = Number(rub);
+        if (!isFinite(rub) || Math.floor(rub) !== rub || rub < T.MIN || rub > T.MAX) fail('Сумма пополнения: от ' + T.MIN + ' до ' + T.MAX.toLocaleString('ru-RU') + ' ₽');
+        return sb.functions.invoke('create-stars-invoice', { body: { amount: rub } }).then(function (r) {
+          if (r.error) return fnErr(r.error, 'Не удалось создать счёт. Попробуйте ещё раз').then(function (e) { throw e; });
+          var d = r.data || {};
+          if (!d.url || !/^https:\/\/t\.me\//.test(d.url)) fail('Не удалось создать счёт. Попробуйте ещё раз');
+          return d;
+        });
+      });
+    },
     notifications: function () { return []; }, unreadNotifs: function () { return 0; }, readAllNotifs: function () {}
   };
 })();

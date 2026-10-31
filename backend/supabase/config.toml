@@ -421,3 +421,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.notify-ticket]
 verify_jwt = false
+[functions.create-stars-invoice]
+verify_jwt = false

@@ -90,7 +90,8 @@ EVSA.BANNERS = [
   { title: 'Все игры и сервисы в одном месте', text: EVSA.GAMES.length + ' игр и ' + EVSA.SITES.length + ' сайтов и приложений: аккаунты, донат, буст, промокоды и не только.', cta: 'Открыть каталог', href: '#/games', c1: '#7c3aed', c2: '#0a0614' }
 ];
 
-/* Пополнение через Telegram-бота: рубли → звёзды со скидкой 20% (как в боте: round(rub*0.8), минимум 1) */
-EVSA.TOPUP = { BOT: 'EVSA_SHOP_bot', MIN: 10, MAX: 100000, DISCOUNT: 0.2 };
+/* Пополнение звёздами Telegram: рубли → звёзды со скидкой 20% (как на сервере: round(rub*0.8), минимум 1).
+   MIN/MAX должны совпадать с миграцией stars_topup, Edge Function create-stars-invoice и bot.py. */
+EVSA.TOPUP = { BOT: 'EVSA_SHOP_bot', MIN: 10, MAX: 12500, DISCOUNT: 0.2 };
 EVSA.topupStars = function (rub) { return Math.max(1, Math.round(Number(rub) * (1 - EVSA.TOPUP.DISCOUNT))); };
 EVSA.topupLink = function (rub) { return 'https://t.me/' + EVSA.TOPUP.BOT + '?start=topup_' + Math.floor(Number(rub)); };
