@@ -1,6 +1,6 @@
 /* ===== EVSA SHOP — Хэллоуин 2026 =====
    Отдельный слой поверх style.css. Откат: убрать из index.html строки с css/halloween.css и js/halloween.js. */
-:root,[data-theme=light]{
+:root,[data-theme=dark]{
   --bg:#0a0510;--bg2:#110818;--panel:#170c22;--panel2:#20112f;--panel3:#2c1840;--line:#3b2250;
   --text:#fff3e6;--muted:#bba6cc;--accent:#ff7a00;--accent2:#8bd34a;--gold:#ffc23d;
   --hw-o:#ff7a00;--hw-o2:#ff8c1a;--hw-o3:#ffb347;--hw-p:#8b3dff;--hw-g:#8bd34a;
@@ -217,3 +217,162 @@ h1{color:#ffe9d2}
 .login-hero{box-shadow:0 10px 30px rgba(41,182,246,.35),0 0 30px rgba(255,122,0,.25)}
 /* тыквы «на полу»: на компьютере — слева у меню, чтобы не мешать кнопке профиля */
 @media (min-width:861px){.hw-pk-floor.p1{right:auto;left:calc(var(--side) + 18px)}.hw-pk-floor.p2{right:auto;left:calc(var(--side) + 86px)}}
+
+/* =====================================================================
+   СВЕТЛАЯ ТЕМА ХЭЛЛОУИНА — «тыквенный день»: кремово-персиковый фон,
+   кремовые карточки с оранжевой каймой, тёмно-фиолетовый текст.
+   Всё под [data-theme=light], тёмная ночь остаётся по умолчанию.
+   ===================================================================== */
+[data-theme=light]{
+  --bg:#fff6ec;--bg2:#fff0e0;--panel:#fffdf9;--panel2:#fff4e8;--panel3:#ffe9d3;--line:#f3c9a0;
+  --text:#2a1636;--muted:#6e5a7c;--accent:#e86a00;--accent2:#5c8f1f;--gold:#b7791f;
+  --hw-o:#ff7a00;--hw-o2:#e86a00;--hw-o3:#c2410c;--hw-p:#7c3aed;--hw-g:#4d7c0f;
+  --glow:0 0 18px rgba(255,122,0,.28);--shadow:0 8px 26px rgba(120,60,10,.12);
+  color-scheme:light;
+}
+[data-theme=light] body{background:radial-gradient(900px 600px at 85% -10%,rgba(255,190,120,.55) 0%,transparent 60%),radial-gradient(800px 600px at -10% 110%,rgba(196,160,255,.35) 0%,transparent 60%),linear-gradient(180deg,#fff6ec 0%,#ffe8d1 100%);background-attachment:fixed}
+[data-theme=light] ::selection{background:rgba(255,122,0,.3);color:#2a1636}
+[data-theme=light] h1{color:#2a1636}
+
+/* декорации днём */
+[data-theme=light] .hw-stars{display:none}
+[data-theme=light] .hw-moon{background:radial-gradient(circle at 40% 38%,#fffbe8 0%,#ffe08a 45%,#ffb347 100%);box-shadow:0 0 50px 16px rgba(255,190,90,.4),0 0 140px 50px rgba(255,160,60,.2);opacity:.75}
+[data-theme=light] .hw-moon::after{opacity:.35}
+[data-theme=light] .hw-ghost{opacity:.22;filter:drop-shadow(0 0 2px rgba(80,40,120,.55)) drop-shadow(0 4px 10px rgba(124,58,237,.25))}
+[data-theme=light] .hw-candy{opacity:.45}
+[data-theme=light] .hw-fog{background:radial-gradient(50% 60% at 30% 100%,rgba(167,120,255,.22),transparent 70%),radial-gradient(45% 55% at 75% 100%,rgba(255,140,40,.2),transparent 70%)}
+[data-theme=light] .hw-pk-floor{filter:drop-shadow(0 4px 8px rgba(180,80,0,.35));opacity:.9}
+[data-theme=light] .hw-bat img{filter:drop-shadow(0 1px 2px rgba(255,255,255,.6))}
+[data-theme=light] .hw-web{opacity:.4;filter:invert(1) brightness(.35) sepia(.6) hue-rotate(230deg) saturate(2)}
+
+/* заставка */
+[data-theme=light] .splash{background:radial-gradient(600px 400px at 50% 40%,#fff1de,#ffe0bf 70%)}
+[data-theme=light] .splash::before{filter:drop-shadow(0 6px 14px rgba(200,90,0,.45))}
+[data-theme=light] .splash-logo{color:#c2410c;text-shadow:0 2px 0 rgba(255,255,255,.7),0 0 18px rgba(255,122,0,.35)}
+[data-theme=light] .splash-logo span{background:linear-gradient(90deg,#e85d00,#b83200)}
+[data-theme=light] .splash-bar{background:#f6d6b4}
+
+/* шапка, логотип, меню */
+[data-theme=light] .topbar{background:linear-gradient(180deg,rgba(255,250,243,.94),rgba(255,240,224,.9));border-bottom:1px solid rgba(232,106,0,.35);box-shadow:0 4px 18px rgba(200,100,20,.1)}
+[data-theme=light] .topbar::after{opacity:.55}
+[data-theme=light] .logo{background:linear-gradient(135deg,rgba(255,122,0,.14),rgba(124,58,237,.08));box-shadow:0 0 12px rgba(255,122,0,.2)}
+[data-theme=light] .logo-gem{filter:drop-shadow(0 2px 4px rgba(190,80,0,.45))}
+[data-theme=light] .logo-text b{color:#2a1636;text-shadow:none}
+[data-theme=light] .logo-text i{background:linear-gradient(90deg,#e85d00,#b83200,#e85d00);background-size:200% 100%;-webkit-background-clip:text;background-clip:text}
+[data-theme=light] .search-wrap input{background:#fffdf9;border-color:rgba(232,106,0,.35);color:#2a1636}
+[data-theme=light] .search-wrap input::placeholder{color:#8a7596}
+[data-theme=light] .icon-btn{background:#fffdf9;border-color:rgba(232,106,0,.35);color:#2a1636}
+[data-theme=light] .top-act:hover{background:rgba(255,122,0,.12);color:#c2410c}
+[data-theme=light] .sidebar{background:linear-gradient(180deg,#fff7ee,#ffeedd);border-right-color:rgba(232,106,0,.3)}
+[data-theme=light] .sidebar a:hover{background:rgba(255,122,0,.1);color:#b83200}
+[data-theme=light] .sidebar a.active{background:rgba(255,122,0,.14);color:#2a1636}
+[data-theme=light] .sidebar a.active svg{color:#e86a00;filter:none}
+[data-theme=light] .sidebar-foot::before{color:#c2410c}
+[data-theme=light] .scrim{background:rgba(60,30,70,.35)}
+[data-theme=light] .nav-badge,[data-theme=light] .chat-item .unread{background:#ff7a00;color:#1c0800;box-shadow:0 0 8px rgba(255,122,0,.45)}
+
+/* карусель */
+[data-theme=light] .carousel{border-color:rgba(232,106,0,.45);box-shadow:0 0 0 1px rgba(255,122,0,.12),0 10px 30px rgba(220,110,20,.18)}
+[data-theme=light] .slide{background:radial-gradient(420px 260px at 88% 30%,rgba(255,150,40,.35),transparent 65%),radial-gradient(500px 300px at 0% 100%,rgba(167,120,255,.3),transparent 65%),linear-gradient(125deg,#fff3e4,#ffe2c4 70%)!important}
+[data-theme=light] .slide:nth-child(3n+2){background:radial-gradient(420px 260px at 88% 30%,rgba(167,120,255,.35),transparent 65%),radial-gradient(500px 300px at 0% 100%,rgba(255,150,40,.3),transparent 65%),linear-gradient(125deg,#fbf1ff,#ffe6cc 70%)!important}
+[data-theme=light] .slide:nth-child(3n){background:radial-gradient(420px 260px at 88% 30%,rgba(139,211,74,.3),transparent 65%),radial-gradient(500px 300px at 0% 100%,rgba(255,150,40,.28),transparent 65%),linear-gradient(125deg,#f8fbec,#ffe8d0 70%)!important}
+[data-theme=light] .slide:first-child{background:radial-gradient(240px 240px at 84% 22%,rgba(255,236,170,.95),rgba(255,190,90,.45) 40%,transparent 70%),radial-gradient(600px 300px at 10% 110%,rgba(255,140,40,.4),transparent 65%),linear-gradient(160deg,#fff4e6 0%,#ffe1c0 60%,#f6d8ff 100%)!important}
+[data-theme=light] .slide::after{filter:drop-shadow(0 6px 12px rgba(190,80,0,.4))}
+[data-theme=light] .slide h1{color:#b83200;text-shadow:0 2px 0 rgba(255,255,255,.8)}
+[data-theme=light] .slide:first-child h1{background:linear-gradient(180deg,#ff8c1a,#d14b00 55%,#8f2a00);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 2px 0 rgba(255,255,255,.85))}
+[data-theme=light] .slide p{color:#3d2450;text-shadow:none}
+[data-theme=light] .dots button{background:rgba(194,65,12,.25)}
+[data-theme=light] .dots button.on{background:#ff7a00;box-shadow:0 0 8px rgba(255,122,0,.6)}
+
+/* заголовки */
+[data-theme=light] .page>h1,[data-theme=light] .section-head h2,[data-theme=light] .hero h1{color:#c2410c;text-shadow:0 1px 0 rgba(255,255,255,.8)}
+[data-theme=light] .section-head h2::before{filter:drop-shadow(0 2px 3px rgba(190,80,0,.4))}
+[data-theme=light] .hero{border-color:rgba(232,106,0,.4);background:radial-gradient(600px 240px at 85% 0%,rgba(255,150,40,.22),transparent 70%),radial-gradient(500px 220px at 0% 100%,rgba(167,120,255,.18),transparent 70%),var(--panel)}
+
+/* кнопки */
+[data-theme=light] .btn{border-color:rgba(232,106,0,.35);background:#fff4e8;color:#2a1636}
+[data-theme=light] .btn:hover:not(:disabled){border-color:#e86a00;box-shadow:0 0 12px rgba(255,122,0,.22)}
+[data-theme=light] .btn.ghost{background:transparent}
+[data-theme=light] .btn.primary,[data-theme=light] .btn.primary.tg-pay{background:linear-gradient(135deg,#ffa53d 0%,#ff7a00 50%,#f06400 100%);color:#1c0800;border-color:transparent;box-shadow:0 4px 16px rgba(255,122,0,.4),0 0 0 1px rgba(255,200,130,.6) inset;text-shadow:0 1px 0 rgba(255,220,170,.5)}
+[data-theme=light] .btn.primary:hover:not(:disabled){box-shadow:0 6px 24px rgba(255,122,0,.55),0 0 0 1px rgba(255,220,150,.7) inset}
+[data-theme=light] .btn.ok{background:linear-gradient(135deg,#7cc33f,#4d8a1c);color:#0d1a02}
+[data-theme=light] .btn.cyan{background:linear-gradient(135deg,#8b3dff,#5b1fb8);color:#fff}
+[data-theme=light] .btn.tg-pay:not(.primary){background:linear-gradient(135deg,#2aabee,#229ed9);color:#fff}
+[data-theme=light] .btn.danger{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.4);color:#b91c1c}
+[data-theme=light] .link-btn:hover{color:#c2410c}
+[data-theme=light] .ripple{background:rgba(255,140,40,.3)}
+
+/* чипы, вкладки */
+[data-theme=light] .chip{border-color:rgba(232,106,0,.3);background:#fffaf3;color:#2a1636}
+[data-theme=light] .chip:hover{color:#b83200;border-color:#e86a00}
+[data-theme=light] .chip.active{background:linear-gradient(135deg,#ff9a2e,#ff6a00);color:#1c0800;box-shadow:0 0 12px rgba(255,122,0,.4)}
+[data-theme=light] .tab.active{color:#c2410c;border-color:#ff7a00}
+[data-theme=light] .seg button{color:#5a4668}
+[data-theme=light] .seg button.active{background:#fff;color:#b83200;box-shadow:0 2px 8px rgba(200,100,20,.18)}
+[data-theme=light] .pill{background:rgba(124,58,237,.12);color:#6d28d9}
+[data-theme=light] .steps .step.cur span{color:#c2410c}
+
+/* карточки */
+[data-theme=light] .tile,[data-theme=light] .pcard,[data-theme=light] .cat-card,[data-theme=light] .card,[data-theme=light] .stat,[data-theme=light] .rv-card,[data-theme=light] .chat-list,[data-theme=light] .chat-win,[data-theme=light] .ghead,[data-theme=light] .prof-link{border-color:rgba(232,106,0,.3);box-shadow:0 2px 10px rgba(200,100,20,.06)}
+[data-theme=light] .tile:hover,[data-theme=light] .pcard:hover,[data-theme=light] .cat-card:hover{border-color:#ff8c1a;box-shadow:0 0 0 1px rgba(255,122,0,.3),0 8px 24px rgba(255,122,0,.2)}
+[data-theme=light] .tile-name{color:#2a1636}
+[data-theme=light] .pcard{background:linear-gradient(180deg,rgba(255,122,0,.06),var(--panel) 45%)}
+[data-theme=light] .card{background:linear-gradient(180deg,rgba(124,58,237,.04),transparent 40%),var(--panel)}
+[data-theme=light] .price b{color:#c2410c}
+[data-theme=light] .cat-card .ci{background:rgba(255,122,0,.14);color:#c2410c}
+[data-theme=light] .prof-link svg{color:#e86a00}
+[data-theme=light] .note{background:rgba(255,122,0,.08);border-color:rgba(232,106,0,.4)}
+[data-theme=light] .status.open{background:rgba(255,122,0,.14);color:#b83200}
+[data-theme=light] .status.reserved,[data-theme=light] .status.pending{color:#a16207}
+[data-theme=light] .status.paid,[data-theme=light] .status.delivered,[data-theme=light] .status.approved{color:#0e7490}
+[data-theme=light] .status.completed,[data-theme=light] .status.done,[data-theme=light] .plus,[data-theme=light] .hint.ok,[data-theme=light] .sup-status.ok{color:#15803d}
+[data-theme=light] .status.dispute,[data-theme=light] .status.rejected,[data-theme=light] .status.refunded,[data-theme=light] .status.banned,[data-theme=light] .minus,[data-theme=light] .err,[data-theme=light] .sup-status.bad{color:#b91c1c}
+[data-theme=light] .empty .big{color:#e9c7a3}
+
+/* пустые состояния */
+[data-theme=light] .empty{border-color:rgba(232,106,0,.45);background:radial-gradient(120% 90% at 50% 0%,rgba(255,150,40,.12),transparent 70%),rgba(255,253,249,.6);color:#6e5a7c}
+[data-theme=light] .empty-ico,[data-theme=light] .empty-sell .es-ico{filter:drop-shadow(0 6px 10px rgba(190,80,0,.35))}
+[data-theme=light] .empty-sell{border-color:rgba(232,106,0,.55);background:radial-gradient(120% 90% at 50% 0%,rgba(255,150,40,.16),transparent 70%),radial-gradient(80% 60% at 50% 100%,rgba(167,120,255,.12),transparent 70%),rgba(255,253,249,.6)}
+[data-theme=light] .empty-sell b{color:#c2410c;text-shadow:none}
+
+/* профиль, баланс, пополнение */
+[data-theme=light] .prof-card{background:radial-gradient(120% 120% at 0% 0%,rgba(255,150,40,.16),transparent 60%),radial-gradient(80% 80% at 100% 100%,rgba(167,120,255,.14),transparent 60%),var(--panel)}
+[data-theme=light] .balance-box{border-color:rgba(232,106,0,.45);background:radial-gradient(300px 120px at 100% 0,rgba(255,150,40,.25),transparent),#fff4e8;box-shadow:0 4px 18px rgba(255,122,0,.14)}
+[data-theme=light] .balance-box b{color:#b83200;text-shadow:none}
+[data-theme=light] .plus-btn,[data-theme=light] .upl-plus{background:linear-gradient(135deg,#ffa53d,#ff6a00);color:#1c0800;box-shadow:0 4px 14px rgba(255,122,0,.45)}
+[data-theme=light] .topup-quote{background:rgba(255,122,0,.1);border-color:rgba(232,106,0,.45)}
+[data-theme=light] .topup-quote b{color:#b83200}
+[data-theme=light] .amounts button{color:#2a1636}
+[data-theme=light] .amounts button.active{border-color:#ff7a00;background:rgba(255,122,0,.14);box-shadow:0 0 10px rgba(255,122,0,.3)}
+[data-theme=light] .input,[data-theme=light] .select,[data-theme=light] textarea.input{background:#fffdf9;border-color:rgba(232,106,0,.35);color:#2a1636}
+[data-theme=light] .input::placeholder,[data-theme=light] textarea.input::placeholder{color:#8a7596}
+[data-theme=light] .input:hover{border-color:rgba(232,106,0,.6)}
+[data-theme=light] .input:focus,[data-theme=light] .select:focus{border-color:#ff7a00;box-shadow:0 0 0 3px rgba(255,122,0,.18)}
+[data-theme=light] .switch span{background:#ead9c8}
+
+/* модальные окна */
+[data-theme=light] .modal{border-color:rgba(232,106,0,.45);background:radial-gradient(400px 200px at 100% 0%,rgba(255,150,40,.14),transparent 70%),radial-gradient(300px 200px at 0% 100%,rgba(167,120,255,.12),transparent 70%),#fffdf9;box-shadow:0 20px 50px rgba(90,40,10,.22),0 0 30px rgba(255,122,0,.18)}
+[data-theme=light] .modal-head h2,[data-theme=light] .modal-head h3{color:#c2410c}
+[data-theme=light] .modal-x{background:#fff4e8;border-color:rgba(232,106,0,.35);color:#2a1636}
+[data-theme=light] .modal-bg{background:rgba(60,30,70,.38)}
+
+/* чаты */
+[data-theme=light] .msg .bubble{background:#fff1e2;color:#2a1636;border:1px solid rgba(232,106,0,.2)}
+[data-theme=light] .msg.me .bubble{background:linear-gradient(135deg,#ff9a2e,#ff7a00);color:#1c0800;border-color:transparent}
+[data-theme=light] .msg.sys .bubble{background:transparent;border:1px dashed rgba(232,106,0,.45);color:#6e5a7c}
+[data-theme=light] .msg.support .bubble{background:linear-gradient(135deg,rgba(124,58,237,.1),rgba(59,130,246,.1));border:1px solid rgba(124,58,237,.3)}
+[data-theme=light] .chat-item:hover,[data-theme=light] .chat-item.active{background:rgba(255,122,0,.1)}
+
+/* профиль-кнопка, тосты, нижние вкладки */
+[data-theme=light] .profile-fab{background:#fffdf9;border-color:#ff7a00;box-shadow:0 0 0 6px rgba(255,122,0,.12),0 8px 24px rgba(120,60,10,.2),0 0 16px rgba(255,122,0,.35)}
+[data-theme=light] .profile-fab svg{color:#e86a00}
+[data-theme=light] .toast{background:#fffdf9;color:#2a1636}
+@media (max-width:860px){
+  [data-theme=light] .bottom-tabs{background:linear-gradient(180deg,rgba(255,250,243,.95),rgba(255,238,220,.97));border-top:1px solid rgba(232,106,0,.4);box-shadow:0 -6px 20px rgba(200,100,20,.12)}
+  [data-theme=light] .bottom-tabs a{color:#6e5a7c}
+  [data-theme=light] .bottom-tabs a.active{color:#c2410c}
+  [data-theme=light] .bottom-tabs a.active svg{color:#e86a00;filter:drop-shadow(0 0 4px rgba(255,122,0,.5))}
+  [data-theme=light] .bottom-tabs .sell-tab svg{background:linear-gradient(135deg,#ffa53d,#ff6a00);color:#1c0800;box-shadow:0 4px 14px rgba(255,122,0,.5)}
+  [data-theme=light] .hw-web{opacity:.35}
+  [data-theme=light] .hw-moon{opacity:.6}
+}
