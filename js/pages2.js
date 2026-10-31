@@ -25,7 +25,7 @@
     if (tab === 'requests') {
       var ws = db.withdrawalsOf(me.id), ds = db.depositsOf(me.id);
       body = '<h3 style="margin:6px 0">Заявки на вывод</h3>' + (ws.length ? ws.map(function (w) { return '<div class="list-row"><div class="grow small">Вывод · ' + U.dt(w.createdAt) + '</div><span class="status ' + w.status + '">' + WST[w.status] + '</span><b class="small">' + U.rub(w.amount) + '</b></div>'; }).join('') : '<div class="muted small">Нет заявок</div>') +
-        '<h3 style="margin:16px 0 6px">Пополнения</h3>' + (ds.length ? ds.map(function (d) { return '<div class="list-row"><div class="grow small">' + (d.method === 'gift' ? 'Подарок ' + EVSA.SUPPORT_TG : 'Telegram Stars (' + d.stars + ' ⭐)') + ' · ' + U.dt(d.createdAt) + '</div><span class="status ' + (d.status === 'confirmed' || d.status === 'demo_credited' ? 'done' : d.status === 'rejected' ? 'rejected' : 'pending') + '">' + DST[d.status] + '</span><b class="small">' + U.rub(d.rub) + '</b></div>'; }).join('') : '<div class="muted small">Нет пополнений</div>');
+        '<h3 style="margin:16px 0 6px">Пополнения</h3>' + (ds.length ? ds.map(function (d) { return '<div class="list-row"><div class="grow small">' + (d.method === 'gift' ? 'Подарок' : d.method === 'demo' ? 'Тестовое пополнение (демо)' : 'Telegram Stars (' + d.stars + ' ⭐)') + ' · ' + U.dt(d.createdAt) + '</div><span class="status ' + (d.status === 'confirmed' || d.status === 'demo_credited' ? 'done' : d.status === 'rejected' ? 'rejected' : 'pending') + '">' + DST[d.status] + '</span><b class="small">' + U.rub(d.rub) + '</b></div>'; }).join('') : '<div class="muted small">Нет пополнений</div>');
     }
     el.innerHTML = '<div class="page" style="max-width:860px"><div class="card">' + (banned ? '<div class="note bad" style="margin-bottom:14px">Аккаунт заблокирован' + (me.ban.perm ? ' навсегда' : ' до ' + U.dt(me.ban.until)) + '. Причина: ' + esc(me.ban.reason) + '. Покупки, продажи и чаты недоступны. Вы можете написать в поддержку.</div>' : '') +
       '<div class="prof-top"><label style="cursor:pointer;position:relative" title="Обновить аватарку">' + U.avatar(me, 'xl') + '<input type="file" accept="image/jpeg,image/png,image/webp" id="avaFile" hidden></label><div class="grow"><h1>' + esc(me.name) + '</h1>' +
@@ -169,32 +169,71 @@
   };
 
   /* ================= ПОДДЕРЖКА ================= */
-  P.support = function (el, live) {
-    var me = db.me(); if (!me) return P.needLogin(el, 'Поддержка');
-    db.markSupportRead();
+  var GKEY = 'evsa_guest_support';
+  function guestHist() { try { var a = JSON.parse(localStorage.getItem(GKEY) || '[]'); return a && a.length !== undefined ? a : []; } catch (e) { return []; } }
+  function guestPush(x) { try { var a = guestHist(); a.push(x); localStorage.setItem(GKEY, JSON.stringify(a.slice(-50))); } catch (e) {} }
+  function supportMsgs(me) {
+    var sys = '<div class="msg sys"><div class="bubble">Здравствуйте! Это официальная поддержка EVSA SHOP. Выберите категорию и опишите проблему' + (me ? ' — мы ответим здесь.' : '. Войти не обязательно: оставьте контакт (Telegram или e-mail), чтобы мы могли ответить.') + '</div></div>';
+    if (!me) return sys + guestHist().map(function (g) {
+      return '<div class="msg me"><div><div class="tiny muted" style="text-align:right;margin-bottom:3px">Гость · <span class="status open" style="font-size:10px;padding:1px 6px">' + esc(g.cat) + '</span> · № ' + esc(g.ticketId) + '</div><div class="bubble">' + esc(g.text) + '</div><div class="time" style="text-align:right">' + U.date(g.at) + ' · ' + U.time(g.at) + ' · отправлено ✓</div></div></div>';
+    }).join('');
     var all = []; db.ticketsOf(me.id).forEach(function (t) { t.messages.forEach(function (m) { all.push({ t: t, m: m }); }); });
     all.sort(function (a, b) { return a.m.at - b.m.at; });
-    var msgs = '<div class="msg sys"><div class="bubble">Здравствуйте! Это официальная поддержка EVSA SHOP. Выберите категорию и опишите проблему — мы ответим здесь.</div></div>' + all.map(function (x) {
+    return sys + all.map(function (x) {
       if (x.m.from === 'support') return '<div class="msg them support"><span class="ava s" style="background:linear-gradient(135deg,#22d3ee,#3b82f6)">ES</span><div><div class="tiny" style="margin-bottom:3px"><b>Поддержка</b> ' + U.verified + '</div><div class="bubble">' + esc(x.m.text) + '</div><div class="time">' + U.dt(x.m.at) + '</div></div></div>';
       return '<div class="msg me"><div><div class="tiny muted" style="text-align:right;margin-bottom:3px">' + esc(me.name) + ' · ID ' + me.tgId + ' · <span class="status open" style="font-size:10px;padding:1px 6px">' + esc(x.t.category) + '</span></div><div class="bubble">' + esc(x.m.text) + '</div><div class="time" style="text-align:right">' + U.date(x.m.at) + ' · ' + U.time(x.m.at) + '</div></div></div>';
     }).join('');
-    var head = '<div class="chat-head"><button class="icon-btn mobile-back" data-href="#/chats" aria-label="Назад" style="width:36px;height:36px">' + I.back + '</button><span class="ava" style="background:linear-gradient(135deg,#22d3ee,#3b82f6)">ES</span><div><b>Поддержка</b> ' + U.verified + '<div class="tiny muted">Официальная поддержка EVSA SHOP</div></div></div>';
-    if (live && U.$('#supInner', el)) { U.$('#supInner', el).innerHTML = head + '<div class="msgs" id="msgs">' + msgs + '</div>'; U.$('.chat-list', el).innerHTML = chatListHtml('support'); }
-    else {
-      el.innerHTML = '<div class="page"><div class="chat-layout has-chat"><div class="chat-list">' + chatListHtml('support') + '</div><div class="chat-win"><div id="supInner" style="display:flex;flex-direction:column;flex:1;min-height:0">' + head + '<div class="msgs" id="msgs">' + msgs + '</div></div>' +
-        '<form class="composer" id="supForm" style="flex-wrap:wrap"><select class="select" id="supCat" style="flex:1 1 100%">' + EVSA.TICKET_CATEGORIES.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select><input class="input" id="supText" placeholder="Опишите проблему…" maxlength="' + EVSA.remoteSupport.MAX_TEXT + '" autocomplete="off"><button class="btn primary" id="supBtn" aria-label="Отправить">' + I.send + '</button><div class="tiny muted" style="flex:1 1 100%">Сообщения отправляются команде EVSA SHOP. Не пишите пароли и коды из SMS.</div></form></div></div></div>';
-      U.$('#supForm', el).onsubmit = function (e) {
-        e.preventDefault(); var i = U.$('#supText', el), btn = U.$('#supBtn', el), cat = U.$('#supCat', el).value, text = i.value.trim();
-        if (btn.disabled) return;
-        var left = EVSA.remoteSupport.cooldownLeft();
-        if (left > 0) return U.err({ userMessage: 'Подождите ' + Math.ceil(left / 1000) + ' с перед следующим обращением' });
-        var t = U.try(function () { return db.sendSupport(cat, text); }); if (!t) return;
-        i.value = ''; btn.disabled = true;
-        EVSA.remoteSupport.send({ category: cat, text: text, name: me.name, username: me.username ? '@' + me.username : '', localTicketId: t.id })
-          .then(function (r) { EVSA.sound.success(); U.toast('Обращение отправлено в поддержку (№ ' + r.ticketId + ')', 'ok'); },
-                function (err) { U.err({ userMessage: (err && err.userMessage) || 'Не удалось отправить обращение. Попробуйте позже.' }); })
-          .then(function () { btn.disabled = false; });
-      };
+  }
+  P.support = function (el, live) {
+    var me = db.me();
+    if (me) db.markSupportRead();
+    var head = '<div class="chat-head"><button type="button" class="icon-btn mobile-back" data-href="' + (me ? '#/chats' : '#/') + '" aria-label="Назад" style="width:36px;height:36px">' + I.back + '</button><span class="ava" style="background:linear-gradient(135deg,#22d3ee,#3b82f6)">ES</span><div><b>Поддержка</b> ' + U.verified + '<div class="tiny muted">Официальная поддержка EVSA SHOP</div></div></div>';
+    var inner = head + '<div class="msgs" id="msgs">' + supportMsgs(me) + '</div>';
+    if (live && U.$('#supInner', el)) {
+      U.$('#supInner', el).innerHTML = inner;
+      var cl = U.$('.chat-list', el); if (cl && me) cl.innerHTML = chatListHtml('support');
+    } else {
+      var form = '<form class="composer" id="supForm" style="flex-wrap:wrap" novalidate><select class="select" id="supCat" style="flex:1 1 100%">' + EVSA.TICKET_CATEGORIES.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select>' +
+        (me ? '' : '<input class="input" id="supContact" style="flex:1 1 100%" maxlength="80" autocomplete="off" placeholder="Ваш Telegram @username или e-mail (необязательно)">') +
+        '<input class="input" id="supText" placeholder="Опишите проблему…" maxlength="' + EVSA.remoteSupport.MAX_TEXT + '" autocomplete="off"><button type="button" class="btn primary" id="supBtn" aria-label="Отправить">' + I.send + '</button>' +
+        '<div class="sup-status" id="supStatus" role="status" aria-live="polite"></div>' +
+        '<div class="tiny muted" style="flex:1 1 100%">' + (me ? '' : 'Можно писать без входа. ') + 'Сообщения отправляются команде EVSA SHOP. Не пишите пароли и коды из SMS.</div></form>';
+      el.innerHTML = '<div class="page"><div class="chat-layout has-chat' + (me ? '' : ' guest-support') + '">' + (me ? '<div class="chat-list">' + chatListHtml('support') + '</div>' : '') + '<div class="chat-win"><div id="supInner" style="display:flex;flex-direction:column;flex:1;min-height:0">' + inner + '</div>' + form + '</div></div></div>';
+      var sending = false;
+      function status(text, type) {
+        var s = U.$('#supStatus', el); if (s) { s.className = 'sup-status ' + (type || 'info'); s.textContent = text; }
+        if (type !== 'info') U.toast(text, type);
+      }
+      function onSend(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        try {
+          if (sending) { status('Отправляем… подождите', 'info'); return false; }
+          var i = U.$('#supText', el), btn = U.$('#supBtn', el), cat = U.$('#supCat', el).value, text = String(i.value || '').replace(/^\s+|\s+$/g, '');
+          var ce = U.$('#supContact', el), contact = ce ? String(ce.value || '').replace(/^\s+|\s+$/g, '') : '';
+          var cur = db.me();
+          if (text.length < 2) { status('Напишите сообщение (минимум 2 символа)', 'bad'); EVSA.sound.error(); i.focus(); return false; }
+          var left = EVSA.remoteSupport.cooldownLeft();
+          if (left > 0) { status('Подождите ' + Math.ceil(left / 1000) + ' с перед следующим обращением', 'bad'); EVSA.sound.error(); return false; }
+          sending = true; btn.disabled = true; status('Отправляем обращение…', 'info');
+          EVSA.remoteSupport.send({ category: cat, text: text, guest: !cur, contact: contact, name: cur ? cur.name : 'Гость', username: cur && cur.username ? '@' + cur.username : '' }, function (err, t) {
+            sending = false; btn.disabled = false;
+            try {
+              if (err) { status((err && err.userMessage) || 'Не удалось отправить обращение. Попробуйте позже.', 'bad'); EVSA.sound.error(); return; }
+              i.value = ''; try { i.blur(); } catch (x) {}
+              if (cur) { try { db.sendSupport(cat, text); } catch (x) {} } else { guestPush({ cat: cat, text: text, at: Date.now(), ticketId: t.ticketId }); P.support(el, true); }
+              var box2 = U.$('#msgs', el); if (box2) box2.scrollTop = box2.scrollHeight;
+              status('✓ Обращение отправлено в поддержку (№ ' + t.ticketId + ')' + (!cur && !contact ? '. Оставьте контакт, если нужен ответ.' : ''), 'ok'); EVSA.sound.success();
+            } catch (x) { status('Обращение отправлено, но страница не обновилась. Обновите её.', 'ok'); }
+          });
+        } catch (ex) {
+          sending = false; var b2 = U.$('#supBtn', el); if (b2) b2.disabled = false;
+          if (window.console) console.error(ex);
+          status('Ошибка при отправке: ' + (ex && (ex.userMessage || ex.message) || 'неизвестная ошибка') + '. Попробуйте ещё раз.', 'bad');
+        }
+        return false;
+      }
+      U.$('#supForm', el).onsubmit = onSend;
+      U.$('#supBtn', el).onclick = onSend;
     }
     var box = U.$('#msgs', el); box.scrollTop = box.scrollHeight;
   };

@@ -222,36 +222,50 @@
     U.$('#rpGo', b).onclick = function () { U.try(function () { db.sendSupport('Жалоба на продавца', 'Жалоба на товар «' + p.title + '» (продавец ' + db.user(p.sellerId).name + '): ' + U.$('#rpR', b).value + '. ' + U.$('#rpT', b).value); U.closeModal(); EVSA.sound.success(); U.toast('Жалоба отправлена в поддержку', 'ok', '#/support'); }); };
   }
 
-  /* ---- пополнение (демо) ---- */
+  /* ---- пополнение: через Telegram-бота (ссылка t.me/<бот>?start=topup_<сумма>) ---- */
   function depositModal(need) {
-    var start = need ? Math.max(10, Math.ceil(need)) : 100;
-    var b = U.modal('Пополнение баланса', '<div class="tabs" style="margin-top:0"><button class="tab active" data-m="stars">⭐ Telegram Stars</button><button class="tab" data-m="gift">🎁 Подарком</button></div><div id="depBody"></div>');
-    function stars() {
-      U.$('#depBody', b).innerHTML = '<div class="stack"><label class="field">Сумма, ₽<input class="input" id="dSum" type="number" inputmode="numeric" min="10" max="100000" value="' + start + '"></label>' +
-        '<div class="amounts">' + [50, 100, 250, 500].map(function (x) { return '<button class="btn sm" data-s="' + x + '">' + x + ' ₽</button>'; }).join('') + '</div>' +
-        '<div class="row between"><span class="muted">К оплате</span><b id="dStars"></b></div><div class="tiny muted">Курс: 1 ⭐ ≈ ' + EVSA.STAR_RATE_RUB + ' ₽ (в рабочей версии курс задаёт сервер).</div>' +
-        '<button class="btn primary block" id="dGo">Создать счёт</button><div id="dInv"></div></div>';
-      var s = U.$('#dSum', b);
-      function q() { var v = Number(s.value) || 0; U.$('#dStars', b).textContent = db.starsQuote(v).stars + ' ⭐'; }
-      s.oninput = q; q();
-      U.$$('[data-s]', b).forEach(function (x) { x.onclick = function () { s.value = x.dataset.s; q(); }; });
-      U.$('#dGo', b).onclick = function () {
-        U.try(function () {
-          var d = db.createStarsDeposit(s.value);
-          U.$('#dInv', b).innerHTML = '<div class="card" style="margin:0"><b>Счёт на ' + d.stars + ' ⭐ (' + U.rub(d.rub) + ')</b><div class="small muted" style="margin:6px 0 12px">Оплата Telegram Stars скоро появится. Сейчас это демо — настоящие деньги не списываются.</div>' +
-            '<button class="btn block" disabled>Оплатить в Telegram — скоро</button><button class="btn cyan block" style="margin-top:8px" id="dDemo">Зачислить тестовые ' + U.rub(d.rub) + ' (демо)</button></div>';
-          U.$('#dDemo', b).onclick = function () { U.try(function () { db.demoCreditDeposit(d.id); U.closeModal(); EVSA.sound.success(); render(true); }); };
-        });
-      };
+    var T = EVSA.TOPUP;
+    var start = need ? Math.min(T.MAX, Math.max(T.MIN, Math.ceil(need))) : 100;
+    var b = U.modal('Пополнение баланса', '<div class="stack">' +
+      '<label class="field">Сумма пополнения, ₽<input class="input" id="dSum" type="number" inputmode="numeric" min="' + T.MIN + '" max="' + T.MAX + '" step="1" value="' + start + '"></label>' +
+      '<div class="amounts" style="grid-template-columns:repeat(4,1fr)">' + [100, 200, 500, 1000].map(function (x) { return '<button type="button" class="btn sm" data-s="' + x + '">' + x + ' ₽</button>'; }).join('') + '</div>' +
+      '<div class="topup-quote"><span class="muted small">К оплате звёздами<br><span class="tiny">скидка ' + Math.round(T.DISCOUNT * 100) + '%</span></span><b id="dStars"></b></div>' +
+      '<div class="err" id="dErr"></div>' +
+      '<a class="btn primary block tg-pay" id="dGo" href="#" target="_blank" rel="noopener">' + I.tg + 'Пополнить через Telegram</a>' +
+      '<div class="tiny muted">Откроется бот @' + esc(T.BOT) + ' — он покажет сумму в звёздах и кнопку оплаты. Оплата звёздами скоро появится, сейчас это демо.</div>' +
+      '<button type="button" class="demo-link" id="dDemo">демо: добавить тестовые рубли</button></div>');
+    var s = U.$('#dSum', b), go = U.$('#dGo', b), errBox = U.$('#dErr', b);
+    function amount() { var v = Number(String(s.value).replace(',', '.')); return v; }
+    function check() {
+      var v = amount();
+      if (!isFinite(v) || String(s.value).trim() === '') return 'Введите сумму в рублях';
+      if (Math.floor(v) !== v) return 'Сумма — целое число рублей';
+      if (v < T.MIN || v > T.MAX) return 'Сумма пополнения: от ' + T.MIN + ' до ' + T.MAX.toLocaleString('ru-RU') + ' ₽';
+      return '';
     }
-    function gift() {
-      U.$('#depBody', b).innerHTML = '<div class="stack"><div class="note small">Отправьте подарок в Telegram на аккаунт <b>' + esc(EVSA.SUPPORT_TG) + '</b>, затем создайте заявку. Администратор проверит подарок и зачислит сумму вручную.</div>' +
-        '<label class="field">Стоимость подарка, ₽<input class="input" id="gSum" type="number" inputmode="numeric" min="10" value="' + start + '"></label><label class="field">Какой подарок отправили<input class="input" id="gNote" maxlength="200" placeholder="Например: Плюшевый мишка, 15 ⭐"></label>' +
-        '<button class="btn primary block" id="gGo">Я отправил подарок</button></div>';
-      U.$('#gGo', b).onclick = function () { U.try(function () { db.createGiftDeposit(U.$('#gSum', b).value, U.$('#gNote', b).value); U.closeModal(); U.toast('Заявка создана — ожидает проверки', 'ok'); }); };
+    function q() {
+      var e = check();
+      U.$('#dStars', b).textContent = e ? '—' : db.starsQuote(amount()).stars + ' ⭐';
+      go.href = e ? '#' : EVSA.topupLink(amount());
+      if (!e) errBox.textContent = '';
     }
-    U.$$('[data-m]', b).forEach(function (t) { t.onclick = function () { U.$$('[data-m]', b).forEach(function (x) { x.classList.toggle('active', x === t); }); (t.dataset.m === 'gift' ? gift : stars)(); }; });
-    stars();
+    s.oninput = q; q();
+    U.$$('[data-s]', b).forEach(function (x) { x.onclick = function () { s.value = x.dataset.s; q(); }; });
+    go.onclick = function (ev) {
+      try {
+        var e = check();
+        if (e) { ev.preventDefault(); errBox.textContent = e; EVSA.sound.error(); U.toast(e, 'bad'); return false; }
+        var url = EVSA.topupLink(amount());
+        var tg = window.Telegram && window.Telegram.WebApp;
+        if (tg && tg.openTelegramLink && tg.initData) { ev.preventDefault(); tg.openTelegramLink(url); }
+        U.toast('Открываем бота @' + T.BOT + '… Если не открылся — нажмите ещё раз', 'info');
+      } catch (x) { ev.preventDefault(); U.err({ userMessage: 'Не удалось открыть Telegram: ' + (x && x.message || 'ошибка') }); }
+      return true;
+    };
+    U.$('#dDemo', b).onclick = function () {
+      var e = check(); if (e) { errBox.textContent = e; EVSA.sound.error(); U.toast(e, 'bad'); return; }
+      U.try(function () { db.demoTopup(amount()); U.closeModal(); EVSA.sound.success(); U.toast('Зачислено ' + U.rub(amount()) + ' тестовых (демо, не настоящие деньги)', 'ok'); render(true); });
+    };
   }
   function withdrawModal() {
     var me = db.me(), amounts = [15, 25, 50, 75, 100, 125, 150, 175, 200, 300, 500, 1000];

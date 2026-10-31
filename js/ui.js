@@ -72,9 +72,18 @@
     el.className = 'toast ' + (type || 'info'); el.innerHTML = '<span class="dot"></span><div>' + U.esc(text) + '</div>';
     el.onclick = function () { if (link) location.hash = link.replace(/^#/, ''); kill(); };
     box.appendChild(el); while (box.children.length > 4) box.removeChild(box.firstChild);
-    function kill() { el.classList.add('out'); setTimeout(function () { el.remove(); }, 300); }
-    setTimeout(kill, 4200);
+    U.placeToasts();
+    function kill() { el.classList.add('out'); setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 300); }
+    setTimeout(kill, type === 'bad' ? 6000 : 4500);
   };
+  /* На телефоне при открытой клавиатуре фиксированный верх может уехать за экран — держим тосты в видимой области */
+  U.placeToasts = function () {
+    try {
+      var box = U.$('#toasts'), vv = window.visualViewport; if (!box) return;
+      if (vv && window.innerWidth <= 900 && vv.offsetTop > 0) box.style.top = (vv.offsetTop + 12) + 'px'; else box.style.top = '';
+    } catch (e) {}
+  };
+  if (window.visualViewport) { window.visualViewport.addEventListener('resize', U.placeToasts); window.visualViewport.addEventListener('scroll', U.placeToasts); }
   U.err = function (e) { console.warn(e); U.toast(e && e.userMessage ? e.userMessage : 'Что-то пошло не так', 'bad'); EVSA.sound.error(); };
   U.try = function (fn) { try { return fn(); } catch (e) { if (e && e.userMessage) U.err(e); else { console.error(e); U.err(e); } return undefined; } };
 

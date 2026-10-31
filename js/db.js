@@ -372,7 +372,14 @@
     markSupportRead: function () { var u = me(); if (!u) return; var ch = false; D.tickets.forEach(function (t) { if (t.userId === u.id && t.unreadUser) { t.unreadUser = 0; ch = true; } }); if (ch) save(); },
 
     /* --- пополнение --- */
-    starsQuote: function (rub) { rub = Number(rub); return { rub: rub, stars: Math.ceil(rub / EVSA.STAR_RATE_RUB) }; },
+    starsQuote: function (rub) { rub = Number(rub); return { rub: rub, stars: EVSA.topupStars(rub) }; },
+    /* ТОЛЬКО ДЕМО: тестовые рубли без оплаты (для проверки покупок) */
+    demoTopup: function (rub) {
+      var u = requireActive(); rub = Math.floor(Number(rub));
+      if (!(rub >= 10 && rub <= 100000)) fail('Сумма пополнения: от 10 до 100 000 ₽');
+      var d = { id: uid('d'), userId: u.id, method: 'demo', rub: rub, stars: 0, status: 'awaiting_payment', createdAt: now() };
+      D.deposits.push(d); save(); return this.demoCreditDeposit(d.id);
+    },
     createStarsDeposit: function (rub) {
       var u = requireActive(); rub = Math.floor(Number(rub));
       if (!(rub >= 10 && rub <= 100000)) fail('Сумма пополнения: от 10 до 100 000 ₽');

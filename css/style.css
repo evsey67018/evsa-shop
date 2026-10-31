@@ -459,3 +459,17 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .demo-banner .ds{display:none}
 @media (max-width:600px){.demo-banner .dl{display:none}.demo-banner .ds{display:inline}}
 @media (max-width:860px){.pp{display:flex!important;flex-direction:column}.pp>div:first-child{display:contents}.pp .pp-img{order:0}.pp>div:first-child>.card{order:2}.pp>div:nth-child(2){order:1}}
+
+/* ===== поддержка: статус отправки, гостевой режим ===== */
+.chat-layout.guest-support{grid-template-columns:1fr;max-width:820px;margin:0 auto}
+.sup-status{flex:1 1 100%;font-size:13px;font-weight:600;min-height:0;line-height:1.35}
+.sup-status:empty{display:none}
+.sup-status.info{color:var(--muted)}.sup-status.ok{color:#4ade80}.sup-status.bad{color:#f87171}
+/* toasts всегда поверх всего и видны на телефоне (позиция подстраивается под экранную клавиатуру в ui.js) */
+.toasts{z-index:1000}
+.toast{word-break:break-word}
+/* пополнение через Telegram */
+.topup-quote{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.35)}
+.topup-quote b{font-size:18px}
+.btn.tg-pay{background:linear-gradient(135deg,#2aabee,#229ed9);color:#fff;border-color:transparent;text-decoration:none;justify-content:center}
+.demo-link{background:none;border:0;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:4px 0;align-self:center}

@@ -108,3 +108,8 @@ EVSA.BANNERS = [
   { title: 'Пополнение Steam', text: 'Удобная форма пополнения Steam по логину. Скоро — в рабочей версии.', cta: 'Открыть', href: '#/steam', c1: '#1e40af', c2: '#05070d' },
   { title: 'Приглашай друзей', text: 'Реферальная программа: делитесь ссылкой и получайте бонусы.', cta: 'Подробнее', href: '#/referral', c1: '#be185d', c2: '#0b0508' }
 ];
+
+/* Пополнение через Telegram-бота: рубли → звёзды со скидкой 20% (как в боте: round(rub*0.8), минимум 1) */
+EVSA.TOPUP = { BOT: 'EVSA_SHOP_bot', MIN: 10, MAX: 100000, DISCOUNT: 0.2 };
+EVSA.topupStars = function (rub) { return Math.max(1, Math.round(Number(rub) * (1 - EVSA.TOPUP.DISCOUNT))); };
+EVSA.topupLink = function (rub) { return 'https://t.me/' + EVSA.TOPUP.BOT + '?start=topup_' + Math.floor(Number(rub)); };
