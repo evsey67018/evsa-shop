@@ -515,3 +515,9 @@ img[src*="assets/icons/"]:not(.ico-img):not(.ico-bg){object-fit:contain!importan
   .search-wrap .search-ico{left:11px}
   .logo{padding:6px 8px;gap:6px}.logo-text{letter-spacing:.06em;gap:4px}
 }
+/* пустое состояние «стань первым продавцом» */
+.empty-sell{border-style:dashed;border-color:rgba(139,92,246,.45);background:radial-gradient(120% 90% at 50% 0%,rgba(139,92,246,.14),transparent 70%);color:var(--text)}
+.empty-sell b{display:block;font-size:17px;font-family:var(--font-d)}
+.empty-sell .es-ico{width:52px;height:52px;margin:0 auto 12px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),#ec4899);box-shadow:0 8px 24px rgba(139,92,246,.35)}
+.empty-sell .es-ico svg{width:26px;height:26px;stroke:#fff;stroke-width:2.4;fill:none}
+.empty-sell .btn svg{width:18px;height:18px}

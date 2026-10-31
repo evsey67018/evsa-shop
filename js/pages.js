@@ -20,17 +20,24 @@
       '<h2>' + esc(text || 'Нужен вход') + '</h2><p class="muted">Войдите через Telegram, чтобы покупать, продавать и общаться.</p><button class="btn primary" data-act="login">' + I.tg + 'Войти через Telegram</button></div></div>';
   }
   P.needLogin = needLogin;
+  /* Пустое состояние «нет товаров» с кнопкой «Продать» */
+  function emptySell(sellHref, sub) {
+    return '<div class="empty empty-sell"><div class="es-ico">' + I.plus + '</div><b>Пока нет товаров — стань первым продавцом</b><div class="small muted" style="margin-top:4px">' + esc(sub || 'Разместить объявление можно бесплатно, за пару минут') + '</div>' +
+      '<button class="btn primary" style="margin-top:14px" data-href="' + (sellHref || '#/sell') + '">' + I.plus + 'Продать</button></div>';
+  }
+  P.emptySell = emptySell;
 
   I.heart = '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>';
   I.check = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
   I.shield = '<svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>';
   I.flag = '<svg viewBox="0 0 24 24"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg>';
 
-  function railTiles(list, type, more) {
+  function railTiles(list, type, more, square) {
+    var wide = type === 'site' && !square;
     return list.map(function (t, i) {
-      return '<div class="tile' + (type === 'site' ? ' site-tile' : '') + '" data-href="#/t/' + type + '/' + t.id + '" style="animation-delay:' + i * 40 + 'ms">' +
-        U.cover(t, { rank: i + 1, tag: true, wide: type === 'site' }) + '<div class="tile-name">' + esc(t.name) + '</div><div class="tile-sub">' + db.countFor(type, t.id) + ' предложений</div></div>';
-    }).join('') + (more ? '<div class="tile more-tile' + (type === 'site' ? ' site-tile' : '') + '" data-href="' + more + '">' + U.cover({ c1: 'var(--panel2)', c2: 'var(--panel3)', short: 'Ещё →', tag: '' }, { wide: type === 'site' }) + '<div class="tile-name">Ещё</div><div class="tile-sub">Смотреть все</div></div>' : '');
+      return '<div class="tile' + (wide ? ' site-tile' : '') + '" data-href="#/t/' + type + '/' + t.id + '" style="animation-delay:' + i * 40 + 'ms">' +
+        U.cover(t, { rank: i + 1, tag: true, wide: wide }) + '<div class="tile-name">' + esc(t.name) + '</div><div class="tile-sub">' + EVSA.offersText(db.countFor(type, t.id)) + '</div></div>';
+    }).join('') + (more ? '<div class="tile more-tile' + (wide ? ' site-tile' : '') + '" data-href="' + more + '">' + U.cover({ c1: 'var(--panel2)', c2: 'var(--panel3)', short: 'Ещё →', tag: '' }, { wide: wide }) + '<div class="tile-name">Ещё</div><div class="tile-sub">Смотреть все</div></div>' : '');
   }
   function arrowsHead(title, id, link) {
     return '<div class="section-head"><h2>' + title + '</h2><div class="arrows">' + (link ? '<a class="btn sm ghost" href="' + link + '">Все ' + I.right + '</a>' : '') + '<button class="icon-btn" data-scroll="' + id + '" data-dir="-1" aria-label="Влево">' + I.left + '</button><button class="icon-btn" data-scroll="' + id + '" data-dir="1" aria-label="Вправо">' + I.right + '</button></div></div>';
@@ -60,10 +67,10 @@
         return '<div class="slide" style="background:linear-gradient(120deg,' + b.c1 + ',' + b.c2 + ' 75%)"><h1>' + esc(b.title) + '</h1><p>' + esc(b.text) + '</p><a class="btn primary" href="' + b.href + '">' + esc(b.cta) + '</a></div>';
       }).join('') + '</div><div class="dots">' + B.map(function (b, i) { return '<button aria-label="Слайд ' + (i + 1) + '" data-i="' + i + '"' + (i ? '' : ' class="on"') + '></button>'; }).join('') + '</div></section>' +
       '<section class="section">' + arrowsHead('Популярные игры', 'railGames', '#/games') + '<div class="rail" id="railGames">' + railTiles(games.slice(0, 12), 'game', '#/games') + '</div></section>' +
+      '<section class="section">' + arrowsHead('Популярные сайты:', 'railSites', '#/games') + '<div class="rail" id="railSites">' + railTiles(sites, 'site', '#/games', true) + '</div></section>' +
       viewedSection() +
-      (prem.length ? '<section class="section"><div class="section-head"><h2>Премиум товары</h2><span class="muted small">' + total + ' объявлений на площадке</span></div><div class="pgrid">' + prem.map(U.pcard).join('') + '</div></section>' : '') +
-      '<section class="section">' + arrowsHead('Сайты и приложения', 'railSites', '#/games') + '<div class="rail" id="railSites">' + railTiles(sites.slice(0, 10), 'site', '#/games') + '</div></section>' +
-      '<section class="section"><div class="section-head"><h2>Хиты продаж</h2></div><div class="pgrid">' + hot.map(U.pcard).join('') + '</div></section></div>';
+      (prem.length ? '<section class="section"><div class="section-head"><h2>Премиум товары</h2><span class="muted small">' + total + ' ' + EVSA.plural(total, 'объявление', 'объявления', 'объявлений') + ' на площадке</span></div><div class="pgrid">' + prem.map(U.pcard).join('') + '</div></section>' : '') +
+      (hot.length ? '<section class="section"><div class="section-head"><h2>Хиты продаж</h2></div><div class="pgrid">' + hot.map(U.pcard).join('') + '</div></section>' : (total ? '' : '<section class="section">' + emptySell('#/sell', 'Магазин только открылся. Выставьте первый товар — его увидят все покупатели') + '</section>')) + '</div>';
     bindScroll(el);
     var car = U.$('#carousel', el), idx = 0, slides = U.$('.slides', car), dots = U.$$('.dots button', car);
     function go(i) { idx = (i + B.length) % B.length; slides.style.transform = 'translateX(' + (-100 * idx) + '%)'; dots.forEach(function (d, j) { d.classList.toggle('on', j === idx); }); }
@@ -79,7 +86,7 @@
   P.allTargets = function (el) {
     function grid(list, type) {
       return '<div class="all-grid">' + list.slice().sort(function (a, b) { return b.pop - a.pop; }).map(function (t, i) {
-        return '<div class="tile' + (type === 'site' ? ' site-tile' : '') + '" data-href="#/t/' + type + '/' + t.id + '" style="animation-delay:' + i * 25 + 'ms">' + U.cover(t, { tag: true, wide: type === 'site' }) + '<div class="tile-name">' + esc(t.name) + '</div><div class="tile-sub">' + db.countFor(type, t.id) + ' предложений</div></div>';
+        return '<div class="tile' + (type === 'site' ? ' site-tile' : '') + '" data-href="#/t/' + type + '/' + t.id + '" style="animation-delay:' + i * 25 + 'ms">' + U.cover(t, { tag: true, wide: type === 'site' }) + '<div class="tile-name">' + esc(t.name) + '</div><div class="tile-sub">' + EVSA.offersText(db.countFor(type, t.id)) + '</div></div>';
       }).join('') + '</div>';
     }
     el.innerHTML = '<div class="page"><h1 style="margin-bottom:16px">Все игры</h1>' + grid(EVSA.GAMES, 'game') + '<h1 style="margin:28px 0 16px">Сайты и приложения</h1>' + grid(EVSA.SITES, 'site') + '</div>';
@@ -94,7 +101,7 @@
     var chips = '<div class="chips">' + '<button class="chip' + (!cat ? ' active' : '') + '" data-href="#/t/' + type + '/' + id + '">Все<span class="cnt">' + db.countFor(type, id) + '</span></button>' +
       EVSA.CATEGORIES.map(function (c) { return '<button class="chip' + (cat === c.id ? ' active' : '') + '" data-href="#/t/' + type + '/' + id + '/' + c.id + '">' + esc(catLabel(t, c)) + '<span class="cnt">' + db.countFor(type, id, c.id) + '</span></button>'; }).join('') + '</div>';
     var html = '<div class="page"><div class="ghead"><div class="bgglow" style="background:linear-gradient(90deg,' + t.c1 + ',' + t.c2 + ')"></div>' + U.cover(t) +
-      '<div style="position:relative"><div class="muted small">' + (type === 'site' ? 'Сайт / приложение' : 'Игра') + ' · ' + esc(t.tag) + '</div><h1>' + esc(t.name) + '</h1><div class="muted small">' + db.countFor(type, id) + ' предложений от продавцов</div></div></div>' +
+      '<div style="position:relative"><div class="muted small">' + (type === 'site' ? 'Сайт / приложение' : 'Игра') + ' · ' + esc(t.tag) + '</div><h1>' + esc(t.name) + '</h1><div class="muted small">' + (db.countFor(type, id) ? EVSA.offersText(db.countFor(type, id)) + ' от продавцов' : 'Пока нет товаров — стань первым продавцом') + '</div></div></div>' +
       '<div class="sticky-bar"><button class="icon-btn" data-act="back" aria-label="Назад">' + I.left + '</button>' + chips + '</div>';
     if (!cat) {
       html += '<div class="cat-grid" style="margin-top:6px">' + EVSA.CATEGORIES.map(function (c) {
@@ -115,7 +122,7 @@
       var list = db.products({ targetType: type, targetId: id, category: cat || null, search: st.search, sort: st.sort, online: st.online, discountOnly: st.discountOnly, withReviews: st.withReviews, delivery: st.delivery, minPrice: st.minPrice, maxPrice: st.maxPrice });
       var filtered = st.search || st.online || st.discountOnly || st.withReviews || st.delivery || st.minPrice || st.maxPrice;
       U.$('#plist', el).innerHTML = list.length ? '<div class="pgrid">' + list.map(U.pcard).join('') + '</div>' :
-        U.empty(filtered ? 'Ничего не найдено' : 'Пока нет предложений', filtered ? 'Попробуйте изменить фильтры' : 'Станьте первым продавцом в этой категории', '<br><button class="btn primary" data-href="#/sell?t=' + type + '&id=' + id + (cat ? '&c=' + cat : '') + '">' + I.plus + 'Продать</button>');
+        (filtered ? U.empty('Ничего не найдено', 'Попробуйте изменить фильтры') : emptySell('#/sell?t=' + type + '&id=' + id + (cat ? '&c=' + cat : ''), 'Здесь пока пусто. Выставьте товар по «' + t.name + '» первым — покупатели увидят его сразу'));
     }
     U.$('#catSearch', el).oninput = function (e) { st.search = e.target.value; draw(); };
     sel.onchange = function () { st.sort = sel.value; draw(); };
@@ -176,7 +183,7 @@
     var st = db.sellerStats(id), list = db.products({ sellerId: id }), rv = db.reviewsFor(id);
     el.innerHTML = '<div class="page"><div class="card"><div class="prof-top">' + U.avatar(s, 'xl') + '<div><h1>' + esc(s.name) + (db.isBanned(s) ? ' <span class="status banned">заблокирован</span>' : '') + '</h1>' +
       (s.username ? '<div class="muted">@' + esc(s.username) + '</div>' : '') + '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' отзывов · ' + st.sales + ' сделок</div><div class="tiny muted">На EVSA SHOP с ' + U.date(s.createdAt) + '</div></div></div></div>' +
-      '<h2 style="margin:22px 0 12px">Товары продавца (' + list.length + ')</h2>' + (list.length ? '<div class="pgrid">' + list.map(U.pcard).join('') + '</div>' : U.empty('Нет активных объявлений')) +
+      '<h2 style="margin:22px 0 12px">Товары продавца (' + list.length + ')</h2>' + (list.length ? '<div class="pgrid">' + list.map(U.pcard).join('') + '</div>' : (db.me() && db.me().id === id ? emptySell('#/sell', 'У вас пока нет объявлений. Выставьте первый товар') : U.empty('Нет активных объявлений', 'У этого продавца пока нет товаров'))) +
       '<h2 style="margin:22px 0 12px">Отзывы покупателей</h2><div class="card">' + (rv.length ? rv.map(reviewHtml).join('') : '<div class="muted">Пока нет отзывов</div>') + '</div></div>';
   };
 
@@ -190,7 +197,14 @@
       .concat(sites.map(function (g) { return '<div class="tile site-tile" data-href="#/t/site/' + g.id + '">' + U.cover(g, { wide: true, tag: true }) + '<div class="tile-name">' + esc(g.name) + '</div></div>'; }));
     el.innerHTML = '<div class="page"><h1 style="margin-bottom:16px">Поиск: «' + esc(q) + '»</h1>' +
       (tiles.length ? '<div class="section"><h2 style="margin-bottom:10px">Игры и сайты</h2><div class="rail">' + tiles.join('') + '</div></div>' : '') +
-      '<h2 style="margin-bottom:12px">Товары (' + prods.length + ')</h2>' + (prods.length ? '<div class="pgrid">' + prods.slice(0, 60).map(U.pcard).join('') + '</div>' : U.empty('Ничего не найдено', 'Попробуйте другое название')) + '</div>';
+      '<h2 style="margin-bottom:12px">Товары (' + prods.length + ')</h2>' + (prods.length ? '<div class="pgrid">' + prods.slice(0, 60).map(U.pcard).join('') + '</div>' : (db.raw().products.some(function (p) { return p.status === 'active'; }) ? U.empty('Ничего не найдено', 'Попробуйте другое название') : emptySell(tiles.length === 1 ? '#/sell?t=' + (games.length ? 'game&id=' + games[0].id : 'site&id=' + sites[0].id) : '#/sell', 'Каталог игр и сайтов уже готов — товаров пока нет'))) + '</div>';
+  };
+
+  /* ================= САМЫЕ ДЕШЁВЫЕ ТОВАРЫ ================= */
+  P.cheap = function (el) {
+    var list = db.products({ sort: 'cheap' });
+    el.innerHTML = '<div class="page"><div class="row between" style="margin-bottom:16px;flex-wrap:wrap;gap:8px"><h1>Самые дешёвые товары</h1>' + (list.length ? '<span class="muted small">' + list.length + ' ' + EVSA.plural(list.length, 'товар', 'товара', 'товаров') + ' · сначала дешёвые</span>' : '') + '</div>' +
+      (list.length ? '<div class="pgrid">' + list.slice(0, 120).map(U.pcard).join('') + '</div>' : emptySell('#/sell', 'Здесь появятся самые выгодные предложения площадки')) + '</div>';
   };
 
   /* ================= КОРЗИНА ================= */

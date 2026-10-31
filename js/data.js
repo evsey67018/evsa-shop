@@ -67,42 +67,16 @@ EVSA.findTarget = function (type, id) {
   return (type === 'site' ? EVSA.SITES : EVSA.GAMES).find(function (x) { return x.id === id; }) || null;
 };
 /* Настоящие иконки игр и сервисов лежат локально в assets/icons/<id>.webp (без хотлинка) */
-EVSA.ICON_V = '20261031c';
+EVSA.ICON_V = '20261031d';
+/* Склонение: 1 предложение, 2 предложения, 5 предложений */
+EVSA.plural = function (n, one, few, many) { var a = Math.abs(n) % 100, b = a % 10; if (a > 10 && a < 20) return many; if (b > 1 && b < 5) return few; if (b === 1) return one; return many; };
+EVSA.offersText = function (n) { return n ? n + ' ' + EVSA.plural(n, 'предложение', 'предложения', 'предложений') : 'Пока нет предложений'; };
 EVSA.iconFor = function (t) {
   if (!t || !t.id) return '';
   if (!EVSA.findTarget('game', t.id) && !EVSA.findTarget('site', t.id)) return '';
   return 'assets/icons/' + t.id + '.webp?v=' + EVSA.ICON_V;
 };
 EVSA.catName = function (id) { var c = EVSA.CATEGORIES.find(function (x) { return x.id === id; }); return c ? c.name : id; };
-
-/* Демо-продавцы (вымышленные) */
-EVSA.SEED_SELLERS = [
-  { name:'Артём Kraft',  username:'artem_kraft', color:'#8b5cf6' },
-  { name:'Лиза Nova',    username:'liza_nova',   color:'#ec4899' },
-  { name:'Макс Boost',   username:'maxboost',    color:'#22d3ee' },
-  { name:'Даня GG',      username:'danya_gg',    color:'#f59e0b' },
-  { name:'Соня Art',     username:'sonya_art',   color:'#22c55e' },
-  { name:'Игорь Store',  username:'igor_store',  color:'#ef4444' }
-];
-
-EVSA.TEMPLATES = {
-  accounts: [['Аккаунт {g} с редкими скинами', 900, 590], ['Прокачанный аккаунт {g} + почта', 1500, 0], ['Стартовый аккаунт {g}', 250, 0], ['Топ-аккаунт {g}, полный доступ', 3200, 2490]],
-  boost:    [['Буст рейтинга {g} — быстро и безопасно', 600, 450], ['Прокачка уровня {g} до максимума', 1200, 0], ['Помощь в прохождении {g}', 350, 0]],
-  donate:   [['{c} в {g} — 500 шт.', 499, 429], ['{c} в {g} — 1000 шт.', 950, 0], ['{c} в {g} — 100 шт.', 109, 0], ['Боевой пропуск {g}', 799, 690]],
-  promo:    [['Промокод {g} на бонус', 150, 99], ['Подарочный код {g}', 500, 0]],
-  design:   [['Аватарка в стиле {g}', 300, 0], ['Баннер для канала по {g}', 450, 350], ['Превью для видео {g}', 250, 0]],
-  other:    [['Гайд по {g} для новичков', 120, 0], ['Консультация по {g} 30 минут', 200, 0]]
-};
-
-EVSA.REVIEW_TEXTS = [
-  'Всё пришло быстро, продавец вежливый. Рекомендую!',
-  'Отличный продавец, ответил за минуту.',
-  'Товар соответствует описанию, спасибо.',
-  'Немного подождал, но всё честно.',
-  'Супер, буду брать ещё!',
-  'Нормально, без проблем.',
-  'Лучший продавец на площадке 🔥'
-];
 
 /* Способы получения товара */
 EVSA.DELIVERY = ['Вход в аккаунт', 'По ID игрока', 'Передача аккаунта', 'Код / ключ', 'Файл', 'Услуга через чат'];
@@ -112,8 +86,8 @@ EVSA.DELIVERY_BY_CAT = { accounts: 'Передача аккаунта', boost: '
 EVSA.BANNERS = [
   { title: 'Безопасные сделки', text: 'Деньги продавцу — только после того, как вы подтвердите получение товара.', cta: 'Как это работает', href: '#/guarantee', c1: '#7c3aed', c2: '#0b0b12' },
   { title: 'Продавайте на EVSA SHOP', text: 'Выставьте товар бесплатно или поднимите его в топ с Premium всего за 19 ₽.', cta: 'Продать товар', href: '#/sell', c1: '#0891b2', c2: '#06070a' },
-  { title: 'Пополнение Steam', text: 'Удобная форма пополнения Steam по логину. Скоро — в рабочей версии.', cta: 'Открыть', href: '#/steam', c1: '#1e40af', c2: '#05070d' },
-  { title: 'Приглашай друзей', text: 'Реферальная программа: делитесь ссылкой и получайте бонусы.', cta: 'Подробнее', href: '#/referral', c1: '#be185d', c2: '#0b0508' }
+  { title: 'Самые дешёвые товары в EVSA SHOP', text: 'Все предложения площадки от самых недорогих — выбирайте выгодно.', cta: 'Смотреть дешёвые', href: '#/cheap', c1: '#16a34a', c2: '#04100a' },
+  { title: 'Все игры и сервисы в одном месте', text: EVSA.GAMES.length + ' игр и ' + EVSA.SITES.length + ' сайтов и приложений: аккаунты, донат, буст, промокоды и не только.', cta: 'Открыть каталог', href: '#/games', c1: '#7c3aed', c2: '#0a0614' }
 ];
 
 /* Пополнение через Telegram-бота: рубли → звёзды со скидкой 20% (как в боте: round(rub*0.8), минимум 1) */

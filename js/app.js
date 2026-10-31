@@ -20,9 +20,10 @@
     t: function (a) { P.target(view, a[0], a[1], a[2] || null); return 'target'; },
     p: function (a) { P.product(view, a[0]); return 'product'; },
     u: function (a) { P.seller(view, a[0]); return 'seller'; },
+    cheap: function () { P.cheap(view); return 'cheap'; },
     search: function (a) { P.search(view, a[0] || ''); return 'search'; },
     cart: function () { P.cart(view); return 'cart'; },
-    notifications: function () { P.notifications(view); return 'notifications'; },
+    notifications: function () { location.replace('#/'); return 'home'; },
     profile: function (a) { P.profile(view, a[0]); return 'profile'; },
     sell: function (a, q) { P.sell(view, q); return 'sell'; },
     chats: function () { P.chats(view); return 'chats'; },
@@ -55,7 +56,7 @@
   function setBadge(sel, n) { U.$$(sel).forEach(function (b) { b.textContent = n > 99 ? '99+' : n; b.classList.toggle('on', n > 0); }); }
   function updateChrome() {
     var me = db.me();
-    var chats = me ? db.unreadChats() : 0, notif = me ? db.unreadNotifs() : 0, cart = me ? db.cart().length : 0;
+    var chats = me ? db.unreadChats() : 0, notif = 0, cart = me ? db.cart().length : 0;
     setBadge('#badgeChats,[data-badge="chats"]', chats);
     setBadge('#badgeNotif,[data-badge="notif"]', notif);
     setBadge('#badgeCart,[data-badge="cart"]', cart);
@@ -81,12 +82,8 @@
   });
 
   /* ---------- уведомления ---------- */
-  EVSA.onNotify = function (n) {
-    var s = EVSA.settings.get();
-    if (!s.notify || s.dnd) return;
-    U.toast(n.text, n.kind === 'bad' ? 'bad' : n.kind === 'money' || n.kind === 'deal' ? 'ok' : 'info', n.link);
-    if (n.kind === 'message') EVSA.sound.message(); else EVSA.sound.success();
-  };
+  /* уведомления убраны с сайта: всплывающие окна и колокольчик отключены */
+  EVSA.onNotify = function () {};
 
   /* ---------- навигация по клику ---------- */
   document.addEventListener('click', function (e) {
@@ -118,7 +115,7 @@
       case 'back': if (history.length > 1) history.back(); else location.hash = '#/'; return;
       case 'login': case 'switchAcc': return loginModal();
       case 'logout': return confirmModal('Выйти из аккаунта?', 'Данные аккаунта сохранятся в этом браузере.', 'Выйти', function () { db.logout(); U.toast('Вы вышли из аккаунта'); go('#/'); });
-      case 'resetDemo': return confirmModal('Сбросить демо-данные?', 'Все тестовые аккаунты, товары, чаты и балансы в этом браузере будут удалены.', 'Сбросить', function () { db.reset(); U.toast('Демо-данные сброшены', 'ok'); go('#/'); });
+      case 'resetDemo': return confirmModal('Сбросить данные в этом браузере?', 'Все тестовые аккаунты, товары, чаты и балансы в этом браузере будут удалены.', 'Сбросить', function () { db.reset(); U.toast('Демо-данные сброшены', 'ok'); go('#/'); });
       case 'fav':
         if (!need()) return;
         return U.try(function () {
@@ -158,7 +155,6 @@
   function loginModal() {
     var me = db.me();
     var others = db.raw().users.filter(function (u) { return !u.isSeed && (!me || u.id !== me.id); });
-    var sellers = db.raw().users.filter(function (u) { return u.isSeed && u.id.indexOf('u_buyer') !== 0; });
     var b = U.modal('Вход через Telegram', '<div class="stack">' +
       '<div class="note small">Демо-версия: настоящий вход через Telegram заработает после подключения сервера. Сейчас введите имя и username — аккаунт создастся только в этом браузере. Один Telegram = один аккаунт.</div>' +
       '<label class="field">Имя<input class="input" id="lgName" maxlength="40" placeholder="Как вас зовут" value="' + (me ? esc(me.name) : '') + '"></label>' +
@@ -166,7 +162,7 @@
       '<label class="field">Аватарка (необязательно)<input class="input" id="lgAva" type="file" accept="image/jpeg,image/png,image/webp"></label>' +
       '<div class="err" id="lgErr"></div><button class="btn primary block lg" id="lgGo">' + I.tg + 'Войти</button>' +
       (others.length ? '<div class="muted small">Аккаунты в этом браузере</div>' + others.map(function (u) { return '<button class="btn block" data-as="' + u.id + '" style="justify-content:flex-start">' + U.avatar(u, 's') + esc(u.name) + (u.username ? ' <span class="muted small">@' + esc(u.username) + '</span>' : '') + '</button>'; }).join('') : '') +
-      '<details><summary class="small muted" style="cursor:pointer">Войти как демо-продавец (для теста продаж)</summary><div class="stack" style="margin-top:8px">' + sellers.map(function (u) { return '<button class="btn block sm" data-as="' + u.id + '" style="justify-content:flex-start">' + U.avatar(u, 's') + esc(u.name) + '</button>'; }).join('') + '</div></details></div>');
+      '</div>');
     var ava = null;
     U.$('#lgAva', b).onchange = function (e) { U.readImage(e.target.files[0], 256, function (err, url) { if (err) return U.err(err); ava = url; }); };
     U.$('#lgGo', b).onclick = function () {

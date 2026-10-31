@@ -32,61 +32,47 @@
   }
 
   function emptyDB() {
-    return { v: 1, users: [], products: [], orders: [], transactions: [], reviews: [], chats: [], messages: [],
+    return { v: 2, users: [], products: [], orders: [], transactions: [], reviews: [], chats: [], messages: [],
       tickets: [], notifications: [], withdrawals: [], deposits: [], bans: [], warnings: [], adminLogs: [], tasks: [], cart: {}, favs: {}, viewed: {}, currentUserId: null };
   }
 
-  /* ---------- сидирование демо-данных ---------- */
-  function seed() {
-    D = emptyDB();
-    var r = rng(20261031);
-    var t0 = now() - 40 * DAY;
-    EVSA.SEED_SELLERS.forEach(function (s, i) {
-      D.users.push({ id: 'u_seed' + i, tgId: hashTg(s.username), name: s.name, username: s.username, avatar: null, color: s.color,
-        balance: 0, reserved: 0, warnings: 0, ban: null, createdAt: t0 + i * DAY, isSeed: true });
-    });
-    var buyers = [];
-    ['Кирилл', 'Вика', 'Саша', 'Ника', 'Тимур', 'Олег', 'Маша', 'Глеб'].forEach(function (n, i) {
-      var u = { id: 'u_buyer' + i, tgId: hashTg('buyer' + n), name: n, username: '', avatar: null, color: ['#6366f1', '#14b8a6', '#f97316', '#e11d48', '#84cc16', '#0ea5e9', '#a855f7', '#eab308'][i],
-        balance: 0, reserved: 0, warnings: 0, ban: null, createdAt: t0, isSeed: true };
-      D.users.push(u); buyers.push(u);
-    });
-    var targets = EVSA.GAMES.map(function (g) { return ['game', g]; }).concat(EVSA.SITES.map(function (s) { return ['site', s]; }));
-    targets.forEach(function (pair) {
-      var tgt = pair[1]; var n = Math.max(3, Math.round(tgt.pop / 12));
-      for (var k = 0; k < n; k++) {
-        var cat = EVSA.CATEGORIES[Math.floor(r() * EVSA.CATEGORIES.length)].id;
-        if (k < EVSA.CATEGORIES.length) cat = EVSA.CATEGORIES[k].id; // каждая категория не пустая
-        var tpl = EVSA.TEMPLATES[cat][Math.floor(r() * EVSA.TEMPLATES[cat].length)];
-        var seller = D.users[Math.floor(r() * EVSA.SEED_SELLERS.length)];
-        var mult = 0.6 + r() * 0.9;
-        var price = Math.max(29, Math.round(tpl[1] * mult / 10) * 10 - 1);
-        var sale = tpl[2] ? Math.max(19, Math.round(tpl[2] * mult / 10) * 10 - 1) : 0;
-        var title = tpl[0].replace('{g}', tgt.name).replace('{c}', tgt.cur || 'Валюта');
-        D.products.push({ id: 'p' + D.products.length, sellerId: seller.id, targetType: pair[0], targetId: tgt.id, category: cat,
-          title: title, desc: 'Описание: ' + title + '.\n\n• Передача сразу после оплаты через чат сделки.\n• Гарантия: деньги в резерве до подтверждения получения.\n• Вопросы — пишите продавцу до покупки.',
-          buyerMsg: 'Спасибо за покупку! Данные придут в этом чате.', oldPrice: sale ? price : 0, price: sale ? sale : price,
-          image: null, delivery: EVSA.DELIVERY_BY_CAT[cat], premium: r() < 0.16, status: 'active', sales: Math.floor(r() * tgt.pop * 2), createdAt: t0 + Math.floor(r() * 39 * DAY) });
+  /* ---------- старт: пустой магазин (демо-товары, продавцы и отзывы удалены) ---------- */
+  function seed() { D = emptyDB(); D.v = 2; save(); }
+
+  /* Одноразовая чистка браузеров, где остались старые демо-данные (версия базы 1) */
+  function purgeDemo() {
+    var bad = {}, gone = {};
+    D.users.forEach(function (u) { if (u.isSeed) bad[u.id] = 1; });
+    D.products.forEach(function (p) { if (bad[p.sellerId]) gone[p.id] = 1; });
+    D.orders.forEach(function (o) {
+      if (!bad[o.sellerId] && !gone[o.productId]) return;
+      var b = D.users.find(function (u) { return u.id === o.buyerId; });
+      if (b && !bad[b.id] && (o.status === 'reserved' || o.status === 'delivered' || o.status === 'dispute')) {
+        b.reserved = money(Math.max(0, (b.reserved || 0) - o.price)); b.balance = money((b.balance || 0) + o.price);
+        D.transactions.push({ id: uid('t'), userId: b.id, type: 'refund', amount: money(o.price), note: 'Возврат: тестовый товар «' + o.title + '» удалён', ref: o.id, createdAt: now() });
       }
     });
-    // отзывы демо-покупателей
-    D.users.slice(0, EVSA.SEED_SELLERS.length).forEach(function (s) {
-      var cnt = 4 + Math.floor(r() * 10);
-      var sp = D.products.filter(function (x) { return x.sellerId === s.id; });
-      for (var i = 0; i < cnt; i++) {
-        var b = buyers[Math.floor(r() * buyers.length)];
-        var rating = r() < 0.75 ? 5 : (r() < 0.6 ? 4 : 3);
-        D.reviews.push({ id: 'rv' + D.reviews.length, orderId: 'seed', productId: sp.length ? sp[Math.floor(r() * sp.length)].id : null, sellerId: s.id, buyerId: b.id, rating: rating,
-          text: EVSA.REVIEW_TEXTS[Math.floor(r() * EVSA.REVIEW_TEXTS.length)], createdAt: t0 + Math.floor(r() * 39 * DAY) });
-      }
-    });
-    save();
+    var badChat = {};
+    D.chats.forEach(function (c) { if (bad[c.a] || bad[c.b] || gone[c.productId]) badChat[c.id] = 1; });
+    D.users = D.users.filter(function (u) { return !bad[u.id]; });
+    D.products = D.products.filter(function (p) { return !gone[p.id]; });
+    D.orders = D.orders.filter(function (o) { return !bad[o.sellerId] && !gone[o.productId]; });
+    D.reviews = D.reviews.filter(function (r) { return r.orderId !== 'seed' && !bad[r.sellerId] && !bad[r.buyerId]; });
+    D.chats = D.chats.filter(function (c) { return !badChat[c.id]; });
+    D.messages = D.messages.filter(function (m) { return !badChat[m.chatId]; });
+    D.notifications = D.notifications.filter(function (n) { var m = /#\/chat\/([^/?#]+)/.exec(n.link || ''); return !(m && badChat[m[1]]); });
+    D.tasks = [];
+    ['cart', 'favs', 'viewed'].forEach(function (k) { Object.keys(D[k] || {}).forEach(function (uidk) { if (Array.isArray(D[k][uidk])) D[k][uidk] = D[k][uidk].filter(function (id) { return !gone[id]; }); }); });
+    if (D.currentUserId && bad[D.currentUserId]) D.currentUserId = null;
+    D.v = 2;
+    try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) {}
   }
 
   function load() {
     try { D = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { D = null; }
-    if (!D || D.v !== 1) seed();
+    if (!D || (D.v !== 1 && D.v !== 2)) seed();
     Object.keys(emptyDB()).forEach(function (k) { if (D[k] === undefined) D[k] = emptyDB()[k]; });
+    if (D.v === 1) purgeDemo();
   }
 
   /* ---------- доступ ---------- */
@@ -98,7 +84,7 @@
   function requireAdmin() { if (!EVSA.settings.get().adminDemo) fail('Доступ только для администратора'); }
   function disc(p) { return p.oldPrice > p.price ? (p.oldPrice - p.price) / p.oldPrice : 0; }
   /* «онлайн»: текущий пользователь и часть демо-продавцов (детерминированно по часу) */
-  function isOnline(u) { if (!u) return false; if (u.id === D.currentUserId) return true; if (!u.isSeed) return false; var h = new Date().getHours(); var n = parseInt(u.id.replace(/\D/g, ''), 10) || 0; return (n + h) % 3 !== 0; }
+  function isOnline(u) { if (!u) return false; if (u.id === D.currentUserId) return true; return false; }
   function sellerStats(id) {
     var rv = D.reviews.filter(function (r) { return r.sellerId === id; });
     var avg = rv.length ? rv.reduce(function (s, r) { return s + r.rating; }, 0) / rv.length : 0;
@@ -138,30 +124,11 @@
     return m;
   }
 
-  /* ---------- фоновые задачи (ответы демо-продавцов) ---------- */
-  var BOT_REPLIES = ['Здравствуйте! Да, товар в наличии 👍', 'Привет! Всё актуально, можно оформлять.', 'Добрый день! Передача сразу после оплаты.', 'Да, отвечу на любые вопросы 🙂'];
+  /* ---------- фоновые задачи (сейчас нет; демо-боты удалены) ---------- */
   function runTasks() {
-    if (!D) return;
-    var due = D.tasks.filter(function (t) { return t.due <= now(); });
-    if (!due.length) return;
-    D.tasks = D.tasks.filter(function (t) { return t.due > now(); });
-    due.forEach(function (t) {
-      var p = t.payload;
-      if (t.type === 'botReply') {
-        var c = D.chats.find(function (x) { return x.id === p.chatId; }); if (!c) return;
-        pushMsg(c.id, p.botId, BOT_REPLIES[Math.floor(Math.random() * BOT_REPLIES.length)]);
-        notify(p.userId, 'Новое сообщение от ' + user(p.botId).name, '#/chat/' + c.id, 'message');
-      }
-      if (t.type === 'botDeliver') {
-        var o = D.orders.find(function (x) { return x.id === p.orderId; }); if (!o || o.status !== 'reserved') return;
-        var prod = D.products.find(function (x) { return x.id === o.productId; });
-        pushMsg(o.chatId, o.sellerId, 'Товар передан ✅\n\n' + (prod.buyerMsg || '') + '\n\nДемо-данные: логин demo_' + o.id.slice(-5) + ' / код EVSA-' + o.id.slice(-4).toUpperCase() + '\nПроверьте и нажмите «Подтвердить получение».');
-        o.status = 'delivered'; o.deliveredAt = now();
-        pushMsg(o.chatId, 'system', 'Продавец отметил товар как переданный. Проверьте товар и подтвердите получение.', true);
-        notify(o.buyerId, 'Продавец передал товар «' + prod.title + '»', '#/chat/' + o.chatId, 'deal');
-      }
-    });
-    save();
+    if (!D || !D.tasks.length) return;
+    var n = D.tasks.length; D.tasks = D.tasks.filter(function (t) { return t.due > now(); });
+    if (D.tasks.length !== n) save();
   }
 
   /* =========================================================
@@ -270,7 +237,6 @@
         pushMsg(chat.id, 'system', 'Сделка открыта. ' + p.price + ' ₽ зарезервированы и перейдут продавцу только после подтверждения получения.', true);
         notify(p.sellerId, 'Новая покупка: «' + p.title + '» за ' + p.price + ' ₽', '#/chat/' + chat.id, 'deal');
         notify(u.id, 'Вы купили «' + p.title + '». Деньги в резерве до подтверждения.', '#/chat/' + chat.id, 'deal');
-        if (seller.isSeed) schedule(2500, 'botDeliver', { orderId: o.id });
         save(); return o;
       });
     },
@@ -352,7 +318,6 @@
       text = String(text || '').trim(); if (!text) return; var other = c.a === u.id ? c.b : c.a;
       pushMsg(chatId, u.id, text);
       notify(other, 'Новое сообщение от ' + u.name, '#/chat/' + chatId, 'message');
-      if (user(other).isSeed) schedule(1800 + Math.random() * 1500, 'botReply', { chatId: chatId, botId: other, userId: u.id });
       save();
     },
     markRead: function (chatId) { var u = me(); var c = this.chat(chatId); if (c && u && c.unread[u.id]) { c.unread[u.id] = 0; save(); } },
