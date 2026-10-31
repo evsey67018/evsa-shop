@@ -25,7 +25,7 @@
   U.stars = function (r, count) { return '<span class="stars">★ ' + (r ? r.toFixed(1) : '—') + '</span>' + (count != null ? ' <span class="muted">(' + count + ')</span>' : ''); };
 
   /* Если картинка не загрузилась — убираем её, остаётся буквенная плашка */
-  var ICO_ERR = 'onerror="EVSA.ui.icoFail(this)"';
+  var ICO_ERR = 'width="192" height="192" decoding="async" onerror="EVSA.ui.icoFail(this)"'; /* размеры = реальный размер webp-иконок, CSS их перекрывает */
   U.icoFail = function (img) {
     try { var box = img.parentNode; if (box) { box.classList.remove('has-ico'); U.$$('img.ico-img,img.ico-bg', box).forEach(function (x) { if (x.parentNode) x.parentNode.removeChild(x); }); } } catch (e) {}
   };
