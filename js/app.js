@@ -58,11 +58,11 @@
     var chats = me ? db.unreadChats() : 0, notif = me ? db.unreadNotifs() : 0, cart = me ? db.cart().length : 0;
     setBadge('#badgeChats,[data-badge="chats"]', chats);
     setBadge('#badgeNotif,[data-badge="notif"]', notif);
-    setBadge('#badgeCart', cart);
+    setBadge('#badgeCart,[data-badge="cart"]', cart);
     var fb = document.getElementById('fabBadge'); fb.textContent = notif + chats; fb.classList.toggle('on', notif + chats > 0);
     document.getElementById('fabInner').innerHTML = me ? U.avatar(me, 'fab') : '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
     var tl = document.getElementById('topLoginText'); if (tl) tl.textContent = me ? 'Профиль' : 'Войти';
-    document.getElementById('navAdmin').hidden = !EVSA.settings.get().adminDemo;
+    var na = document.getElementById('navAdmin'); if (na) na.hidden = !EVSA.settings.get().adminDemo;
   }
 
   /* перерисовка «живых» страниц при изменении данных (новые сообщения, статусы) */
@@ -102,6 +102,8 @@
 
   document.getElementById('burger').onclick = function () { document.body.classList.toggle('nav-open'); };
   document.getElementById('scrim').onclick = function () { document.body.classList.remove('nav-open'); };
+  /* На узком экране длинная подсказка в поиске обрезается — показываем короткую */
+  (function () { var gs = document.getElementById('globalSearch'); function ph() { if (gs) gs.placeholder = window.innerWidth <= 480 ? 'Поиск' : 'Поиск игр и приложений'; } ph(); window.addEventListener('resize', ph); })();
   document.getElementById('profileFab').onclick = function () { EVSA.sound.click(); if (db.me()) location.hash = '#/profile'; else loginModal(); };
   var gs = document.getElementById('globalSearch');
   gs.addEventListener('keydown', function (e) { if (e.key === 'Enter' && gs.value.trim()) { location.hash = '#/search/' + encodeURIComponent(gs.value.trim()); gs.blur(); } });

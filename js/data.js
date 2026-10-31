@@ -66,6 +66,13 @@ EVSA.SUPPORT_TG = '@evssssa';
 EVSA.findTarget = function (type, id) {
   return (type === 'site' ? EVSA.SITES : EVSA.GAMES).find(function (x) { return x.id === id; }) || null;
 };
+/* Настоящие иконки игр и сервисов лежат локально в assets/icons/<id>.webp (без хотлинка) */
+EVSA.ICON_V = '20261031c';
+EVSA.iconFor = function (t) {
+  if (!t || !t.id) return '';
+  if (!EVSA.findTarget('game', t.id) && !EVSA.findTarget('site', t.id)) return '';
+  return 'assets/icons/' + t.id + '.webp?v=' + EVSA.ICON_V;
+};
 EVSA.catName = function (id) { var c = EVSA.CATEGORIES.find(function (x) { return x.id === id; }); return c ? c.name : id; };
 
 /* Демо-продавцы (вымышленные) */

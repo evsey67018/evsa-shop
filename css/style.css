@@ -473,3 +473,45 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
 .topup-quote b{font-size:18px}
 .btn.tg-pay{background:linear-gradient(135deg,#2aabee,#229ed9);color:#fff;border-color:transparent;text-decoration:none;justify-content:center}
 .demo-link{background:none;border:0;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:4px 0;align-self:center}
+
+/* --- навигация v3: колокольчик в шапке на телефоне, вкладка «Профиль», ссылки в профиле --- */
+.m-bell{display:none;position:relative;flex:none}
+.m-bell em{position:absolute;top:-2px;right:-2px}
+.prof-links{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:14px 0 4px}
+.prof-link{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-weight:600;font-size:13.5px;position:relative;transition:background .2s,transform .15s}
+.prof-link:hover{background:var(--panel3)}
+.prof-link:active{transform:scale(.97)}
+.prof-link svg{width:20px;height:20px;flex:none;color:#a78bfa;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.prof-link span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prof-link em{position:static}
+@media (max-width:860px){
+  .m-bell{display:inline-flex}
+  .profile-fab{display:none!important}
+  .prof-links{grid-template-columns:1fr 1fr}
+}
+
+/* --- настоящие иконки игр и сервисов (буквы остаются запасным вариантом) --- */
+.cover .ico-bg,.part .ico-bg{position:absolute;inset:-20%;width:140%;height:140%;object-fit:cover;filter:blur(26px) saturate(1.5) brightness(.7);opacity:.75;pointer-events:none}
+.cover .ico-img{position:absolute;z-index:1;left:50%;top:42%;width:58%;max-width:150px;aspect-ratio:1;height:auto;transform:translate(-50%,-50%);border-radius:22%;object-fit:cover;box-shadow:0 10px 28px rgba(0,0,0,.55),0 0 26px rgba(139,92,246,.3);transition:transform .35s}
+.cover.wide .ico-img{width:auto;height:58%;top:44%}
+.cover.has-ico .mono{display:none}
+.tile:hover .cover .ico-img{transform:translate(-50%,-50%) scale(1.06)}
+.ghead .cover .ico-img,.pick .cover .ico-img{top:50%;width:70%}
+.mini-ico{position:relative;overflow:hidden}
+.mini-ico .ico-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.part{position:relative;width:100%;height:100%;aspect-ratio:16/10;overflow:hidden;background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--c1) 45%,transparent),transparent 65%),linear-gradient(145deg,#15121f,#07060b)}
+.part .part-fb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0}
+.part:not(.has-ico) .part-fb{opacity:1}
+.part::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.6));pointer-events:none}
+.pimg .part .ico-img,.pp-img .part .ico-img,.part .ico-img{position:absolute;z-index:1;left:50%;top:53%;width:auto!important;height:50%!important;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:22%;object-fit:cover;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 12px 30px rgba(0,0,0,.6),0 0 40px color-mix(in srgb,var(--c1) 55%,transparent);transition:transform .5s}
+.pimg .part .ico-bg,.pp-img .part .ico-bg{width:140%!important;height:140%!important}
+.pcard:hover .pimg .part .ico-img{transform:translate(-50%,-50%) scale(1.07)}
+.pcard:hover .pimg .part img.ico-bg,.pcard:hover .pimg .part img.part-fb{transform:none}
+.part .part-cat{position:absolute;z-index:2;left:12px;bottom:10px;font-size:11px;font-weight:700;color:#fff;padding:4px 9px;border-radius:9px;background:rgba(0,0,0,.5);backdrop-filter:blur(4px)}
+img[src*="assets/icons/"]:not(.ico-img):not(.ico-bg){object-fit:contain!important;background:#0d0b14;padding:3px}
+@media (max-width:860px){.pimg .part .ico-img{top:57%;height:46%!important}}
+@media (max-width:480px){
+  .search-wrap input{padding:0 8px 0 34px}
+  .search-wrap .search-ico{left:11px}
+  .logo{padding:6px 8px;gap:6px}.logo-text{letter-spacing:.06em;gap:4px}
+}

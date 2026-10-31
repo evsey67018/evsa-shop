@@ -24,11 +24,20 @@
   };
   U.stars = function (r, count) { return '<span class="stars">★ ' + (r ? r.toFixed(1) : '—') + '</span>' + (count != null ? ' <span class="muted">(' + count + ')</span>' : ''); };
 
+  /* Если картинка не загрузилась — убираем её, остаётся буквенная плашка */
+  var ICO_ERR = 'onerror="EVSA.ui.icoFail(this)"';
+  U.icoFail = function (img) {
+    try { var box = img.parentNode; if (box) { box.classList.remove('has-ico'); U.$$('img.ico-img,img.ico-bg', box).forEach(function (x) { if (x.parentNode) x.parentNode.removeChild(x); }); } } catch (e) {}
+  };
   U.cover = function (t, opts) {
     opts = opts || {};
-    return '<div class="cover' + (opts.wide ? ' wide' : '') + '" style="background:linear-gradient(145deg,' + t.c1 + ' 0%,' + t.c2 + ' 100%)">' +
+    var ico = EVSA.iconFor(t);
+    return '<div class="cover' + (opts.wide ? ' wide' : '') + (ico ? ' has-ico' : '') + '" style="background:linear-gradient(145deg,' + t.c1 + ' 0%,' + t.c2 + ' 100%)">' +
+      (ico ? '<img class="ico-bg" src="' + ico + '" alt="" aria-hidden="true" loading="lazy" ' + ICO_ERR + '>' : '') +
       (opts.rank ? '<span class="rank">#' + opts.rank + '</span>' : '') +
-      '<span class="mono">' + U.esc(t.short) + '</span>' + (opts.tag ? '<span class="ctag">' + U.esc(t.tag) + '</span>' : '') + '</div>';
+      '<span class="mono">' + U.esc(t.short) + '</span>' +
+      (ico ? '<img class="ico-img" src="' + ico + '" alt="' + U.esc(t.name || '') + '" loading="lazy" ' + ICO_ERR + '>' : '') +
+      (opts.tag ? '<span class="ctag">' + U.esc(t.tag) + '</span>' : '') + '</div>';
   };
 
   /* Обложка товара: загруженное фото или аккуратная сгенерированная заглушка */
@@ -43,13 +52,37 @@
       '<text x="36" y="166" font-family="Arial,sans-serif" font-weight="700" font-size="14" fill="#fff">' + U.esc(cat) + '</text></svg>';
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   };
-  U.pimg = function (p) { return p.image || U.productArt(p); };
+  U.pimg = function (p) {
+    if (p.image) return p.image;
+    var ico = EVSA.iconFor(EVSA.findTarget(p.targetType, p.targetId));
+    return ico ? ico + '#' + (p.targetType === 'site' ? 'site' : 'game') + ':' + encodeURIComponent(p.category || '') : U.productArt(p);
+  };
+  /* Миниатюры товаров с иконкой: если файл не загрузился — подставляем сгенерированную плашку */
+  document.addEventListener('error', function (e) {
+    try {
+      var img = e.target; if (!img || img.tagName !== 'IMG' || img.hasAttribute('onerror')) return;
+      var m = /assets\/icons\/([a-z0-9]+)\.webp[^#]*#(game|site):(.*)$/.exec(img.getAttribute('src') || ''); if (!m) return;
+      img.src = U.productArt({ targetType: m[2], targetId: m[1], category: decodeURIComponent(m[3]) });
+    } catch (x) {}
+  }, true);
   U.imgTag = function (p, alt) {
     var fallback = U.productArt(p);
+    if (!p.image) {
+      /* Нет фото от продавца — иконка игры/сервиса в тёмном неоновом стиле (не скриншот) */
+      var t = EVSA.findTarget(p.targetType, p.targetId) || { c1: '#444', c2: '#111', short: '?' };
+      var ico = EVSA.iconFor(t);
+      if (ico) return '<div class="part has-ico" style="--c1:' + t.c1 + ';--c2:' + t.c2 + '"><img class="part-fb" src="' + fallback + '" alt="' + U.esc(alt || p.title) + '">' +
+        '<img class="ico-bg" src="' + ico + '" alt="" aria-hidden="true" loading="lazy" ' + ICO_ERR + '><img class="ico-img" src="' + ico + '" alt="" loading="lazy" ' + ICO_ERR + '>' +
+        '</div>';
+    }
     return '<img loading="lazy" src="' + U.esc(U.pimg(p)) + '" alt="' + U.esc(alt || p.title) + '" onerror="this.onerror=null;this.src=\'' + fallback + '\'">';
   };
 
-  U.miniIcon = function (t) { return '<span class="mini-ico" style="background:linear-gradient(145deg,' + t.c1 + ',' + t.c2 + ')">' + U.esc(t.short.slice(0, 3)) + '</span>'; };
+  U.miniIcon = function (t) {
+    var ico = EVSA.iconFor(t);
+    return '<span class="mini-ico' + (ico ? ' has-ico' : '') + '" style="background:linear-gradient(145deg,' + t.c1 + ',' + t.c2 + ')">' + U.esc(t.short.slice(0, 3)) +
+      (ico ? '<img class="ico-img" src="' + ico + '" alt="" loading="lazy" ' + ICO_ERR + '>' : '') + '</span>';
+  };
   U.pcard = function (p, i) {
     var s = EVSA.db.user(p.sellerId), st = EVSA.db.sellerStats(p.sellerId), d = U.discount(p.oldPrice, p.price);
     var t = EVSA.findTarget(p.targetType, p.targetId) || { c1: '#444', c2: '#111', short: '?', name: '' };

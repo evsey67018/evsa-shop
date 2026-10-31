@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=20261031b">
+<link rel="stylesheet" href="css/style.css?v=20261031c">
 <script>try{var s=JSON.parse(localStorage.getItem('evsa_settings')||'{}');if(s.theme==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 </head>
 <body>
@@ -27,10 +27,12 @@
     <svg viewBox="0 0 24 24" class="search-ico"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="globalSearch" type="search" placeholder="Поиск игр и приложений" autocomplete="off">
   </div>
+  <a class="icon-btn m-bell" href="#/notifications" aria-label="Уведомления"><svg viewBox="0 0 24 24" class="ico"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20h4"/></svg><em class="nav-badge" data-badge="notif"></em></a>
   <nav class="top-actions" aria-label="Быстрые действия">
     <a class="top-act" href="#/sell"><svg viewBox="0 0 24 24" class="ico"><path d="M12 5v14M5 12h14"/></svg><span>Продать</span></a>
     <a class="top-act" href="#/notifications"><svg viewBox="0 0 24 24" class="ico"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20h4"/></svg><span>Уведомления</span><em class="nav-badge" data-badge="notif"></em></a>
     <a class="top-act" href="#/chats"><svg viewBox="0 0 24 24" class="ico"><path d="M4 5h16v11H8l-4 4z"/></svg><span>Чаты</span><em class="nav-badge" data-badge="chats"></em></a>
+    <a class="top-act" href="#/cart"><svg viewBox="0 0 24 24" class="ico"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg><span>Корзина</span><em class="nav-badge" data-badge="cart"></em></a>
     <a class="top-act" href="#/support"><svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span>Поддержка</span></a>
     <a class="top-act" href="#/profile" id="topLogin"><svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="topLoginText">Войти</span></a>
   </nav>
@@ -42,17 +44,8 @@
 
 <nav class="sidebar" id="sidebar">
   <a href="#/" data-nav="home"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Главная</span></a>
-  <a href="#/chats" data-nav="chats"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg><span>Сообщения</span><em class="nav-badge" id="badgeChats"></em></a>
-  <a href="#/cart" data-nav="cart"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg><span>Корзина</span><em class="nav-badge" id="badgeCart"></em></a>
-  <a href="#/favorites" data-nav="favorites"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><span>Избранное</span></a>
-  <a href="#/sell" data-nav="sell"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Продать</span></a>
-  <a href="#/notifications" data-nav="notifications"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20h4"/></svg><span>Уведомления</span><em class="nav-badge" id="badgeNotif"></em></a>
-  <a href="#/games" data-nav="games"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Все игры и сайты</span></a>
-  <a href="#/steam" data-nav="steam"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M8 11l4-4 4 4"/></svg><span>Пополнение Steam</span></a>
-  <a href="#/referral" data-nav="referral"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 8v6M14 11h6"/></svg><span>Рефералы</span></a>
   <a href="#/support" data-nav="support"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span>Поддержка</span></a>
   <a href="#/settings" data-nav="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3.1 14H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Настройки</span></a>
-  <a href="#/admin" data-nav="admin" id="navAdmin" hidden><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg><span>Админ-панель</span></a>
   <div class="sidebar-foot">EVSA SHOP · демо</div>
 </nav>
 <div class="scrim" id="scrim"></div>
@@ -63,24 +56,24 @@
 
 <nav class="bottom-tabs" id="bottomTabs">
   <a href="#/" data-tab="home"><svg viewBox="0 0 24 24" class="ico"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a>
-  <a href="#/games" data-tab="games"><svg viewBox="0 0 24 24" class="ico"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>Каталог</a>
-  <a href="#/sell" data-tab="sell" class="sell-tab"><svg viewBox="0 0 24 24" class="ico"><path d="M12 5v14M5 12h14"/></svg>Продать</a>
   <a href="#/chats" data-tab="chats"><svg viewBox="0 0 24 24" class="ico"><path d="M4 5h16v11H8l-4 4z"/></svg>Чаты<em class="nav-badge" data-badge="chats"></em></a>
-  <a href="#/notifications" data-tab="notifications"><svg viewBox="0 0 24 24" class="ico"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20h4"/></svg>Уведомл.<em class="nav-badge" data-badge="notif"></em></a>
+  <a href="#/sell" data-tab="sell" class="sell-tab"><svg viewBox="0 0 24 24" class="ico"><path d="M12 5v14M5 12h14"/></svg>Продать</a>
+  <a href="#/cart" data-tab="cart"><svg viewBox="0 0 24 24" class="ico"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg>Корзина<em class="nav-badge" data-badge="cart"></em></a>
+  <a href="#/profile" data-tab="profile"><svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Профиль</a>
 </nav>
 
 <div id="modalRoot"></div>
 <div id="toasts" class="toasts"></div>
 
-<script src="js/data.js?v=20261031b"></script>
-<script src="js/sound.js?v=20261031b"></script>
-<script src="js/db.js?v=20261031b"></script>
-<script src="js/remote.js?v=20261031b"></script>
-<script src="js/ui.js?v=20261031b"></script>
-<script src="js/pages.js?v=20261031b"></script>
-<script src="js/pages2.js?v=20261031b"></script>
-<script src="js/pages3.js?v=20261031b"></script>
-<script src="js/admin.js?v=20261031b"></script>
-<script src="js/app.js?v=20261031b"></script>
+<script src="js/data.js?v=20261031c"></script>
+<script src="js/sound.js?v=20261031c"></script>
+<script src="js/db.js?v=20261031c"></script>
+<script src="js/remote.js?v=20261031c"></script>
+<script src="js/ui.js?v=20261031c"></script>
+<script src="js/pages.js?v=20261031c"></script>
+<script src="js/pages2.js?v=20261031c"></script>
+<script src="js/pages3.js?v=20261031c"></script>
+<script src="js/admin.js?v=20261031c"></script>
+<script src="js/app.js?v=20261031c"></script>
 </body>
 </html>

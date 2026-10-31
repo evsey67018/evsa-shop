@@ -9,6 +9,14 @@
   EVSA.labels = { OST: OST, WST: WST, DST: DST, TXN: TXN };
 
   /* ================= ПРОФИЛЬ ================= */
+  var PL_ICO = {
+    bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20h4"/></svg>',
+    heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+    cart: '<svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h11L21 7H6.2"/><circle cx="9" cy="19.5" r="1.5"/><circle cx="17" cy="19.5" r="1.5"/></svg>',
+    ref: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 8v6M14 11h6"/></svg>',
+    steam: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M8 11l4-4 4 4"/></svg>',
+    admin: '<svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg>'
+  };
   P.profile = function (el, tab) {
     var me = db.me(); if (!me) return P.needLogin(el, 'Профиль');
     tab = tab || 'ops';
@@ -33,6 +41,7 @@
       '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' отзывов</div></div></div>' +
       '<div class="balance-box"><div><div class="muted small">Баланс</div><b>' + U.rub(me.balance) + '</b>' + (me.reserved ? '<div class="tiny muted">в резерве: ' + U.rub(me.reserved) + '</div>' : '') + '</div><button class="plus-btn" data-act="deposit" aria-label="Пополнить">' + I.plus + '</button></div>' +
       '<div class="prof-actions"><button class="btn primary" data-act="deposit">Пополнить</button><button class="btn" data-act="withdraw">Вывести</button><button class="btn cyan" data-href="#/sell">Продать</button></div>' +
+      '<div class="prof-links">' + [['#/notifications', 'Уведомления', 'bell', db.unreadNotifs()], ['#/favorites', 'Избранное', 'heart', 0], ['#/cart', 'Корзина', 'cart', db.cart().length], ['#/referral', 'Рефералы', 'ref', 0], ['#/steam', 'Пополнение Steam', 'steam', 0]].concat(EVSA.settings.get().adminDemo ? [['#/admin', 'Админ-панель', 'admin', 0]] : []).map(function (x) { return '<a class="prof-link" href="' + x[0] + '">' + (PL_ICO[x[2]] || '') + '<span>' + x[1] + '</span>' + (x[3] ? '<em class="nav-badge on">' + (x[3] > 99 ? '99+' : x[3]) + '</em>' : '') + '</a>'; }).join('') + '</div>' +
       '<div class="tabs">' + tabs.map(function (x) { return '<button class="tab' + (x[0] === tab ? ' active' : '') + '" data-href="#/profile/' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><div>' + body + '</div>' +
       '<div class="row wrap" style="margin-top:20px;border-top:1px solid var(--line);padding-top:14px"><button class="btn sm" data-act="login">Синхронизировать с Telegram</button><button class="btn sm" data-act="switchAcc">Сменить аккаунт (демо)</button><button class="btn sm danger" data-act="logout">Выйти</button></div></div></div>';
     var f = U.$('#avaFile', el);
@@ -249,9 +258,10 @@
       '<div class="set-row"><div class="grow"><b>Тема</b><div class="small muted">Сохраняется после перезагрузки</div></div><div class="seg"><button data-theme-set="dark" class="' + (s.theme === 'dark' ? 'active' : '') + '">Тёмная</button><button data-theme-set="light" class="' + (s.theme === 'light' ? 'active' : '') + '">Светлая</button></div></div></div>' +
       '<h2 style="margin:22px 0 12px">Аккаунт</h2><div class="card">' + (me ? '<div class="row">' + U.avatar(me, 'l') + '<div class="grow"><b>' + esc(me.name) + '</b><div class="small muted">' + (me.username ? '@' + esc(me.username) : '') + ' · Telegram ID ' + me.tgId + '</div><div class="tiny muted">Аккаунт создан ' + U.date(me.createdAt) + (me.lastSync ? ' · синхронизирован ' + U.ago(me.lastSync) : '') + '</div></div></div><div class="row wrap" style="margin-top:14px"><button class="btn sm" data-href="#/profile">Открыть профиль</button><button class="btn sm danger" data-act="logout">Выйти</button></div>' : '<div class="row between"><span class="muted">Вы не вошли</span><button class="btn primary sm" data-act="login">Войти через Telegram</button></div>') + '</div>' +
       '<h2 style="margin:22px 0 12px">Демо-режим</h2><div class="card">' + sw('adminDemo', 'Демо-доступ к админ-панели', 'Только для тестирования. В рабочей версии админ-панель доступна лишь администратору (проверка Telegram ID на сервере).') +
+      (s.adminDemo ? '<div class="set-row"><div class="grow"><b>Админ-панель</b><div class="small muted">Управление товарами, пользователями и заявками (демо)</div></div><a class="btn sm" href="#/admin">Открыть</a></div>' : '') +
       '<div class="set-row"><div class="grow"><b>Сбросить демо-данные</b><div class="small muted">Удалит аккаунты, товары, чаты и балансы в этом браузере</div></div><button class="btn sm danger" data-act="resetDemo">Сбросить</button></div></div>' +
       '<div class="note small" style="margin-top:18px">EVSA SHOP — демо-версия. Настоящие платежи, вывод денег и вход через Telegram заработают после подключения сервера (папка <code>server</code> в репозитории).</div></div>';
-    U.$$('[data-set]', el).forEach(function (i) { i.onchange = function () { var p = {}; p[i.dataset.set] = i.checked; EVSA.settings.set(p); EVSA.app.applySettings(); if (i.checked) EVSA.sound.success(); if (i.dataset.set === 'dnd' && !i.checked) { var n = db.unreadNotifs(); if (n) U.toast('Пропущено уведомлений: ' + n, 'info', '#/notifications'); } }; });
+    U.$$('[data-set]', el).forEach(function (i) { i.onchange = function () { var p = {}; p[i.dataset.set] = i.checked; EVSA.settings.set(p); EVSA.app.applySettings(); if (i.checked) EVSA.sound.success(); if (i.dataset.set === 'adminDemo') { P.settings(el); return; } if (i.dataset.set === 'dnd' && !i.checked) { var n = db.unreadNotifs(); if (n) U.toast('Пропущено уведомлений: ' + n, 'info', '#/notifications'); } }; });
     U.$$('[data-theme-set]', el).forEach(function (b) { b.onclick = function (e) { EVSA.app.setTheme(b.dataset.themeSet, e); U.$$('[data-theme-set]', el).forEach(function (x) { x.classList.toggle('active', x === b); }); }; });
   };
 })();
