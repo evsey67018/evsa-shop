@@ -507,7 +507,7 @@
             var m = String(r.error.message || ''), map = { not_signed_in: 'Войдите, чтобы вывести деньги', banned: 'Ваш аккаунт заблокирован',
               owner_unlimited: 'С безлимитного баланса вывод недоступен', below_min: 'Минимальная сумма вывода — ' + W.MIN + ' ₽',
               no_telegram: 'Вывод возможен только для аккаунта, привязанного к Telegram. Войдите через Telegram',
-              no_username: 'Нужен username в Telegram, чтобы мы смогли отправить подарок. Укажите его в настройках Telegram, затем нажмите «Обновить данные из Telegram» в профиле',
+              no_username: 'Не удалось определить ваш аккаунт Telegram. Нажмите «Обновить данные из Telegram» в профиле и попробуйте снова',
               pending_exists: 'У вас уже есть вывод в ожидании — дождитесь его завершения', bad_request: 'Проверьте сумму вывода' };
             var k = Object.keys(map).find(function (x) { return m.indexOf(x) >= 0; });
             throw k ? err(map[k]) : dbErr(r.error, 'Не удалось создать заявку. Деньги не списаны — попробуйте ещё раз');

@@ -37,7 +37,7 @@
     if (tab === 'withdrawals') {
       var wl = db.withdrawals();
       body = wl.length ? '<div class="card">' + wl.map(function (w) { return '<div class="list-row wd-row"><div class="grow"><b class="small">Вывод в Telegram</b><div class="tiny muted">' + U.dt(w.createdAt) + ' · ≈' + EVSA.topupStars(w.rub) + ' ⭐' + (w.processedAt ? ' · ' + (w.status === 'rejected' ? 'отклонён ' : 'завершён ') + U.dt(w.processedAt) : '') + '</div></div><span class="status ' + w.status + '">' + (WST[w.status] || w.status) + '</span><b class="small nowrap"' + (w.status === 'rejected' ? ' title="Возвращено на баланс">↩ ' : '>−') + U.rub(w.rub) + '</b></div>'; }).join('') + '</div>' +
-        '<div class="tiny muted" style="margin-top:8px">Выводы обрабатываются вручную: подарок за звёзды приходит в Telegram на ваш аккаунт @' + esc(me.username || '…') + '. При отклонении сумма возвращается на баланс.</div>' :
+        '<div class="tiny muted" style="margin-top:8px">Выводы обрабатываются вручную: подарок за звёзды приходит в Telegram на ваш аккаунт ' + (me.username ? '@' + esc(me.username) : 'Telegram' + (me.tgId ? ' (ID ' + esc(me.tgId) + ')' : '')) + '. При отклонении сумма возвращается на баланс.</div>' :
         U.empty('Выводов пока нет', 'Нажмите «Вывести» рядом с балансом, чтобы получить подарок за звёзды в Telegram');
     }
     if (tab === 'reviews') { var rv = db.reviewsFor(me.id); body = rv.length ? '<div class="card">' + rv.map(P.reviewHtml).join('') + '</div>' : U.empty('Отзывов пока нет', 'Отзывы оставляют покупатели после завершённой сделки'); }

@@ -271,10 +271,8 @@
       U.modal('Вывод средств', '<div class="stack"><div class="note small"><span class="status pending">В ожидании</span> Вывод <b>' + U.rub(pw.rub) + '</b> (≈' + EVSA.topupStars(pw.rub) + ' ⭐) уже обрабатывается. Новый вывод можно запросить после его завершения.</div>' + hist + '</div>');
       return;
     }
-    var noTg = !me.tgId, noUser = !me.username;
-    if (noTg || noUser) {
-      U.modal('Вывод средств', '<div class="stack"><div class="note bad small">' + (noTg ? 'Вывод возможен только для аккаунта, привязанного к Telegram. Войдите через Telegram.' :
-        'У вашего Telegram нет username — без него мы не сможем отправить подарок. Укажите username в настройках Telegram, затем нажмите «Обновить данные из Telegram».') + '</div>' +
+    if (!me.tgId) {
+      U.modal('Вывод средств', '<div class="stack"><div class="note bad small">Вывод возможен только для аккаунта, привязанного к Telegram. Войдите через Telegram.</div>' +
         '<button type="button" class="btn primary block" data-act="login">' + I.tg + 'Обновить данные из Telegram</button></div>');
       return;
     }
@@ -285,7 +283,7 @@
     }
     var reqId = EVSA.db.newRequestId(), quick = [50, 100, 500, 1000].filter(function (x) { return x <= max; });
     var b = U.modal('Вывод средств', '<div class="stack">' +
-      '<div class="note small wd-note">🎁 <b>Вывод приходит подарком за звёзды в Telegram</b> на ваш аккаунт <b>@' + esc(me.username) + '</b>. Заявка обрабатывается вручную, статус — в «Истории выводов».</div>' +
+      '<div class="note small wd-note">🎁 <b>Вывод приходит подарком за звёзды в Telegram</b> на ваш аккаунт <b>' + (me.username ? '@' + esc(me.username) : 'Telegram ID ' + esc(me.tgId)) + '</b>. Заявка обрабатывается вручную, статус — в «Истории выводов».</div>' +
       '<label class="field">Сумма вывода, ₽<input class="input" id="wSum" type="number" inputmode="numeric" min="' + W.MIN + '" max="' + max + '" step="1" value="' + W.MIN + '"></label>' +
       '<div class="amounts" style="grid-template-columns:repeat(' + (quick.length + (unl ? 0 : 1)) + ',1fr)">' + quick.map(function (x) { return '<button type="button" class="btn sm" data-s="' + x + '">' + x + '\u00a0₽</button>'; }).join('') +
       (unl ? '' : '<button type="button" class="btn sm" data-s="' + max + '">Всё</button>') + '</div>' +
