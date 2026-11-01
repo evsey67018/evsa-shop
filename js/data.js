@@ -94,6 +94,6 @@ EVSA.BANNERS = [
    MIN/MAX должны совпадать с миграцией stars_topup, Edge Function create-stars-invoice и bot.py. */
 EVSA.TOPUP = { BOT: 'EVSA_SHOP_bot', MIN: 10, MAX: 12500, DISCOUNT: 0.2 };
 /* вывод: вручную, подарком за звёзды в Telegram; курс тот же, что у пополнения */
-EVSA.WITHDRAW = { MIN: 100, MAX: 1000000 };
+EVSA.WITHDRAW = { MIN: 50, MAX: 1000000 };
 EVSA.topupStars = function (rub) { return Math.max(1, Math.round(Number(rub) * (1 - EVSA.TOPUP.DISCOUNT))); };
 EVSA.topupLink = function (rub) { return 'https://t.me/' + EVSA.TOPUP.BOT + '?start=topup_' + Math.floor(Number(rub)); };
