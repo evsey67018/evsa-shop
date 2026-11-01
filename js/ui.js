@@ -10,6 +10,13 @@
   U.date = function (t) { return new Date(t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }); };
   U.time = function (t) { return new Date(t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); };
   U.dt = function (t) { return U.date(t) + ', ' + U.time(t); };
+  /* Дата регистрации — по московскому времени (UTC+3, без перехода на летнее время), формат 01.11.2026 в 12:48:05 */
+  U.regDate = function (t) {
+    if (!t) return '—';
+    var d = new Date(Number(t) + 3 * 3600000), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getUTCDate()) + '.' + p(d.getUTCMonth() + 1) + '.' + d.getUTCFullYear() + ' в ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+  };
+  U.regLine = function (t) { return '<div class="tiny muted reg-date" title="Дата регистрации не может быть изменена">Дата регистрации: ' + U.regDate(t) + '</div>'; };
   U.ago = function (t) { var s = (Date.now() - t) / 1000; if (s < 60) return 'только что'; if (s < 3600) return Math.floor(s / 60) + ' мин назад'; if (s < 86400) return Math.floor(s / 3600) + ' ч назад'; return U.date(t); };
   U.discount = function (oldP, newP) { return oldP > 0 && newP < oldP ? Math.round((oldP - newP) / oldP * 100) : 0; };
   U.check = '<svg viewBox="0 0 24 24"><path d="M5 12.5 10 17 19 7"/></svg>';

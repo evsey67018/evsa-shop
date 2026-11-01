@@ -186,7 +186,7 @@
     var s = db.user(id); if (!s || s.missing) { el.innerHTML = '<div class="page">' + U.empty('Пользователь не найден') + '</div>'; return; }
     var st = db.sellerStats(id), list = db.products({ sellerId: id }), rv = db.reviewsFor(id);
     el.innerHTML = '<div class="page"><div class="card"><div class="prof-top">' + U.avatar(s, 'xl') + '<div><h1>' + esc(s.name) + (db.isBanned(s) ? ' <span class="status banned">заблокирован</span>' : '') + '</h1>' +
-      (s.username ? '<div class="muted">@' + esc(s.username) + '</div>' : '') + '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' отзывов · ' + st.sales + ' сделок</div><div class="tiny muted">На EVSA SHOP с ' + U.date(s.createdAt) + '</div></div></div></div>' +
+      (s.username ? '<div class="muted">@' + esc(s.username) + '</div>' : '') + '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' отзывов · ' + st.sales + ' сделок</div>' + U.regLine(s.createdAt) + '</div></div></div>' +
       '<h2 style="margin:22px 0 12px">Товары продавца (' + list.length + ')</h2>' + (list.length ? '<div class="pgrid">' + list.map(U.pcard).join('') + '</div>' : (db.me() && db.me().id === id ? emptySell('#/sell', 'У вас пока нет объявлений. Выставьте первый товар') : U.empty('Нет активных объявлений', 'У этого продавца пока нет товаров'))) +
       '<h2 style="margin:22px 0 12px">Отзывы покупателей</h2><div class="card">' + (rv.length ? rv.map(reviewHtml).join('') : '<div class="muted">Пока нет отзывов</div>') + '</div></div>';
   };
