@@ -75,7 +75,18 @@
     setBadge('#badgeCart,[data-badge="cart"]', cart);
     var fb = document.getElementById('fabBadge'); fb.textContent = notif + chats; fb.classList.toggle('on', notif + chats > 0);
     document.getElementById('fabInner').innerHTML = me ? U.avatar(me, 'fab') : '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
-    var tl = document.getElementById('topLoginText'); if (tl) tl.textContent = me ? 'Профиль' : 'Войти';
+    var tp = document.getElementById('topProfile');
+    if (tp) {
+      var USER_SVG = '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+      document.getElementById('topProfileAva').innerHTML = me ? U.avatar(me, 'tp') : USER_SVG;
+      document.getElementById('topProfileName').textContent = me ? (me.name || 'Профиль') : 'Войти';
+      document.getElementById('topProfileSub').textContent = me ? 'Мой профиль' : 'через Telegram';
+      tp.setAttribute('aria-label', me ? 'Открыть профиль' : 'Войти через Telegram');
+      tp.title = me ? 'Мой профиль' : 'Войти через Telegram';
+      tp.classList.toggle('in', !!me);
+      tp.classList.toggle('active', !!me && /^#\/profile/.test(location.hash));
+      var tb = document.getElementById('topProfileBadge'); tb.textContent = notif + chats > 99 ? '99+' : notif + chats; tb.classList.toggle('on', notif + chats > 0);
+    }
   }
 
   /* перерисовка «живых» страниц при изменении данных (новые сообщения, статусы) */
@@ -114,6 +125,7 @@
   document.getElementById('scrim').onclick = function () { document.body.classList.remove('nav-open'); };
   /* На узком экране длинная подсказка в поиске обрезается — показываем короткую */
   (function () { var gs = document.getElementById('globalSearch'); function ph() { if (gs) gs.placeholder = window.innerWidth <= 480 ? 'Поиск' : 'Поиск игр и приложений'; } ph(); window.addEventListener('resize', ph); })();
+  document.getElementById('topProfile').onclick = function (e) { if (db.me()) return; e.preventDefault(); EVSA.sound.click(); loginModal(); };
   document.getElementById('profileFab').onclick = function () { EVSA.sound.click(); if (db.me()) location.hash = '#/profile'; else loginModal(); };
   var gs = document.getElementById('globalSearch');
   gs.addEventListener('keydown', function (e) { if (e.key === 'Enter' && gs.value.trim()) { location.hash = '#/search/' + encodeURIComponent(gs.value.trim()); gs.blur(); } });
