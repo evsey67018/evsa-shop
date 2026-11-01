@@ -26,11 +26,12 @@
   EVSA.sb = sb;
 
   /* ---------- кэш ---------- */
-  var C = { users: [], products: [], reviews: [], favs: [], chats: [], messages: [], orders: [], settings: null, tgId: null, balance: 0, unlimited: false, topups: [] };
+  var C = { users: [], products: [], reviews: [], favs: [], chats: [], messages: [], orders: [], settings: null, tgId: null, balance: 0, unlimited: false, topups: [], withdrawals: [] };
   var uidMe = null, ready = false, listeners = [], sig = '';
   function emit(force) {
     var s = [C.products.length, C.users.length, C.reviews.length, C.favs.length, C.chats.length, C.messages.length, C.orders.length, uidMe,
-      C.chats.reduce(function (a, c) { return a + c.lastAt + (c.unread[uidMe] || 0); }, 0), C.products.reduce(function (a, p) { return a + p.status.length + p.price; }, 0), C.balance, C.unlimited, C.topups.length].join('|');
+      C.chats.reduce(function (a, c) { return a + c.lastAt + (c.unread[uidMe] || 0); }, 0), C.products.reduce(function (a, p) { return a + p.status.length + p.price; }, 0), C.balance, C.unlimited, C.topups.length,
+      C.withdrawals.map(function (w) { return w.id.slice(0, 4) + w.status[0]; }).join('')].join('|');
     if (!force && s === sig) return; sig = s;
     listeners.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
   }
@@ -97,19 +98,22 @@
       C.products = ps.map(mapProduct); C.users = us.map(mapUser); C.reviews = rv.map(mapReview);
     });
   }
-  function clearPrivate() { C.favs = []; C.chats = []; C.messages = []; C.orders = []; C.settings = null; C.tgId = null; C.balance = 0; C.unlimited = false; C.topups = []; }
+  function clearPrivate() { C.favs = []; C.chats = []; C.messages = []; C.orders = []; C.settings = null; C.tgId = null; C.balance = 0; C.unlimited = false; C.topups = []; C.withdrawals = []; }
   function mapTopup(r) { return { id: r.id, rub: Number(r.amount_rub), stars: r.stars, status: r.status, createdAt: ts(r.created_at), paidAt: ts(r.paid_at) }; }
-  /* баланс и пополнения: только чтение (RLS — свои строки). Ошибка не ломает остальную загрузку. */
+  function mapWithdrawal(r) { return { id: r.id, rub: Number(r.amount_rub), status: r.status, createdAt: ts(r.created_at), processedAt: ts(r.processed_at) }; }
+  /* баланс, пополнения и выводы: только чтение (RLS — свои строки). Ошибка не ломает остальную загрузку. */
   function loadWallet() {
     if (!uidMe) return Promise.resolve();
     var me = uidMe;
     return Promise.all([
       sb.from('wallets').select('balance,unlimited').maybeSingle(),
-      sb.from('star_payments').select('id,amount_rub,stars,status,created_at,paid_at').eq('status', 'paid').order('paid_at', { ascending: false }).limit(50)
+      sb.from('star_payments').select('id,amount_rub,stars,status,created_at,paid_at').eq('status', 'paid').order('paid_at', { ascending: false }).limit(50),
+      sb.from('withdrawals').select('id,amount_rub,status,created_at,processed_at').eq('user_id', me).order('created_at', { ascending: false }).limit(50)
     ]).then(function (rs) {
       if (me !== uidMe) return;
       if (!rs[0].error) { C.balance = rs[0].data ? Number(rs[0].data.balance) || 0 : 0; C.unlimited = !!(rs[0].data && rs[0].data.unlimited); }
       if (!rs[1].error) C.topups = (rs[1].data || []).map(mapTopup);
+      if (!rs[2].error) C.withdrawals = (rs[2].data || []).map(mapWithdrawal);
     }).catch(function (e) { console.warn(e); });
   }
   function loadPrivate() {
@@ -161,6 +165,11 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wallets', filter: 'user_id=eq.' + uidMe }, function (p) {
         if (!p.new || p.new.user_id !== uidMe) return;
         C.balance = Number(p.new.balance) || 0; C.unlimited = !!p.new.unlimited; loadWallet().then(function () { emit(true); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals', filter: 'user_id=eq.' + uidMe }, function (p) {
+        if (!p.new || p.new.user_id !== uidMe) return;
+        upsert(C.withdrawals, mapWithdrawal(p.new)); C.withdrawals.sort(function (a, b) { return b.createdAt - a.createdAt; });
+        loadWallet().then(function () { emit(true); });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, function (p) {
         if (!p.new || !p.new.id) return; upsert(C.orders, mapOrder(p.new)); computeUnread();
@@ -480,6 +489,37 @@
     unlimited: function () { return C.unlimited; },
     topups: function () { return C.topups; },
     refreshWallet: function () { var b = C.balance; return loadWallet().then(function () { emit(); return { balance: C.balance, delta: C.balance - b }; }); },
+    /* --- вывод: заявка → владелец вручную дарит подарок за звёзды в Telegram ---
+       Сумма списывается сразу (на сервере, атомарно); при отклонении возвращается. */
+    withdrawals: function () { return C.withdrawals; },
+    pendingWithdrawal: function () { return C.withdrawals.find(function (w) { return w.status === 'pending'; }) || null; },
+    requestWithdrawal: function (rub, reqId) {
+      return once('withdraw', function () {
+        requireActive();
+        var W = EVSA.WITHDRAW; rub = Number(rub);
+        if (C.unlimited) fail('С безлимитного баланса вывод недоступен');
+        if (!isFinite(rub) || Math.floor(rub) !== rub) fail('Введите целую сумму в рублях');
+        if (rub < W.MIN) fail('Минимальная сумма вывода — ' + W.MIN + ' ₽');
+        if (rub > W.MAX) fail('Максимальная сумма вывода — ' + W.MAX.toLocaleString('ru-RU') + ' ₽');
+        if (rub > C.balance) fail('Недостаточно средств на балансе');
+        return sb.rpc('request_withdrawal', { p_amount: rub, p_request_id: reqId }).then(function (r) {
+          if (r.error) {
+            var m = String(r.error.message || ''), map = { not_signed_in: 'Войдите, чтобы вывести деньги', banned: 'Ваш аккаунт заблокирован',
+              owner_unlimited: 'С безлимитного баланса вывод недоступен', below_min: 'Минимальная сумма вывода — ' + W.MIN + ' ₽',
+              no_telegram: 'Вывод возможен только для аккаунта, привязанного к Telegram. Войдите через Telegram',
+              no_username: 'Нужен username в Telegram, чтобы мы смогли отправить подарок. Укажите его в настройках Telegram, затем нажмите «Обновить данные из Telegram» в профиле',
+              pending_exists: 'У вас уже есть вывод в ожидании — дождитесь его завершения', bad_request: 'Проверьте сумму вывода' };
+            var k = Object.keys(map).find(function (x) { return m.indexOf(x) >= 0; });
+            throw k ? err(map[k]) : dbErr(r.error, 'Не удалось создать заявку. Деньги не списаны — попробуйте ещё раз');
+          }
+          var d = r.data || {};
+          if (d.status === 'insufficient') fail('Недостаточно средств на балансе');
+          if (d.status !== 'ok' && d.status !== 'duplicate') fail('Не удалось создать заявку');
+          if (d.balance != null) C.balance = Number(d.balance) || 0;
+          return loadWallet().then(function () { emit(true); return d; });
+        });
+      });
+    },
     /* → {url, amount, stars}: ссылка на счёт в Telegram Stars */
     createStarsInvoice: function (rub) {
       return once('stars', function () {

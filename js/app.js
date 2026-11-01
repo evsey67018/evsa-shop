@@ -146,6 +146,7 @@
       case 'removeProduct': return confirmModal('Снять товар с продажи?', 'Объявление исчезнет из каталога.', 'Снять', function () { return db.deleteProduct(id).then(function () { U.toast('Товар снят с продажи', 'ok'); location.hash = '#/profile/items'; }); });
       case 'review': return reviewModal(id);
       case 'deposit': if (!need()) return; return depositModal();
+      case 'withdraw': if (!need()) return; return withdrawModal();
     }
   }
 
@@ -261,6 +262,62 @@
      Баланс зачисляет бот после оплаты; сайт только ждёт обновления баланса. */
   var payTimer = null;
   function stopPayPoll() { clearTimeout(payTimer); payTimer = null; }
+  /* вывод: заявка уходит владельцу в Telegram-бота, он вручную дарит подарок за звёзды */
+  function withdrawModal() {
+    var W = EVSA.WITHDRAW, me = db.me(), bal = db.balance(), pw = db.pendingWithdrawal();
+    if (db.unlimited()) { U.toast('С безлимитного баланса вывод недоступен', 'err'); return; }
+    var hist = '<button type="button" class="btn block" data-href="#/profile/withdrawals">История выводов</button>';
+    if (pw) {
+      U.modal('Вывод средств', '<div class="stack"><div class="note small"><span class="status pending">В ожидании</span> Вывод <b>' + U.rub(pw.rub) + '</b> (≈' + EVSA.topupStars(pw.rub) + ' ⭐) уже обрабатывается. Новый вывод можно запросить после его завершения.</div>' + hist + '</div>');
+      return;
+    }
+    var noTg = !me.tgId, noUser = !me.username;
+    if (noTg || noUser) {
+      U.modal('Вывод средств', '<div class="stack"><div class="note bad small">' + (noTg ? 'Вывод возможен только для аккаунта, привязанного к Telegram. Войдите через Telegram.' :
+        'У вашего Telegram нет username — без него мы не сможем отправить подарок. Укажите username в настройках Telegram, затем нажмите «Обновить данные из Telegram».') + '</div>' +
+        '<button type="button" class="btn primary block" data-act="login">' + I.tg + 'Обновить данные из Telegram</button></div>');
+      return;
+    }
+    var max = Math.min(W.MAX, Math.floor(bal));
+    if (max < W.MIN) {
+      U.modal('Вывод средств', '<div class="stack"><div class="note small">Минимальная сумма вывода — <b>' + U.rub(W.MIN) + '</b>. Сейчас на балансе ' + U.rub(bal) + '.</div>' + hist + '</div>');
+      return;
+    }
+    var reqId = EVSA.db.newRequestId(), quick = [100, 500, 1000].filter(function (x) { return x <= max; });
+    var b = U.modal('Вывод средств', '<div class="stack">' +
+      '<div class="note small wd-note">🎁 <b>Вывод приходит подарком за звёзды в Telegram</b> на ваш аккаунт <b>@' + esc(me.username) + '</b>. Заявка обрабатывается вручную, статус — в «Истории выводов».</div>' +
+      '<label class="field">Сумма вывода, ₽<input class="input" id="wSum" type="number" inputmode="numeric" min="' + W.MIN + '" max="' + max + '" step="1" value="' + W.MIN + '"></label>' +
+      '<div class="amounts" style="grid-template-columns:repeat(' + (quick.length + 1) + ',1fr)">' + quick.map(function (x) { return '<button type="button" class="btn sm" data-s="' + x + '">' + x + '\u00a0₽</button>'; }).join('') +
+      '<button type="button" class="btn sm" data-s="' + max + '">Всё</button></div>' +
+      '<div class="topup-quote"><span class="muted small">Подарок примерно на<br><span class="tiny">курс как у пополнения: 100 ₽ ≈ ' + EVSA.topupStars(100) + ' ⭐</span></span><b id="wStars"></b></div>' +
+      '<div class="err" id="wErr" role="alert"></div>' +
+      '<button type="button" class="btn primary block" id="wGo">Подтвердить вывод</button>' +
+      '<div class="tiny muted">Доступно: ' + U.rub(bal) + '. От ' + W.MIN + ' ₽. Сумма спишется с баланса сразу; если вывод отклонят — вернётся.</div></div>');
+    var s = U.$('#wSum', b), btn = U.$('#wGo', b), errBox = U.$('#wErr', b);
+    function amount() { return Number(String(s.value).replace(',', '.')); }
+    function check() {
+      var v = amount();
+      if (!isFinite(v) || String(s.value).trim() === '') return 'Введите сумму в рублях';
+      if (Math.floor(v) !== v) return 'Сумма — целое число рублей';
+      if (v < W.MIN) return 'Минимальная сумма вывода — ' + W.MIN + ' ₽';
+      if (v > db.balance()) return 'Недостаточно средств: на балансе ' + U.rub(db.balance());
+      if (v > W.MAX) return 'Максимальная сумма вывода — ' + W.MAX.toLocaleString('ru-RU') + ' ₽';
+      return '';
+    }
+    function q() { var e = check(); U.$('#wStars', b).textContent = e ? '—' : '≈' + EVSA.topupStars(amount()) + ' ⭐'; if (!e) errBox.textContent = ''; }
+    s.oninput = function () { reqId = EVSA.db.newRequestId(); q(); }; q();
+    U.$$('[data-s]', b).forEach(function (x) { x.onclick = function () { s.value = x.dataset.s; reqId = EVSA.db.newRequestId(); q(); }; });
+    btn.onclick = function () {
+      var e = check();
+      if (e) { errBox.textContent = e; EVSA.sound.error(); return; }
+      var v = amount();
+      U.busy(btn, db.requestWithdrawal(v, reqId)).then(function () {
+        EVSA.sound.success(); U.closeModal();
+        U.toast('Заявка на вывод ' + U.rub(v) + ' отправлена. Статус: «В ожидании»', 'ok', '#/profile/withdrawals');
+        go('#/profile/withdrawals');
+      }).catch(function (x) { errBox.textContent = x.userMessage || 'Не удалось создать заявку'; EVSA.sound.error(); });
+    };
+  }
   function depositModal(need) {
     var T = EVSA.TOPUP;
     var start = need ? Math.min(T.MAX, Math.max(T.MIN, Math.ceil(need))) : 100;

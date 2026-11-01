@@ -3,7 +3,9 @@
 (function () {
   var U = EVSA.ui, db = EVSA.db, esc = U.esc, P = EVSA.pages, I = EVSA.icons;
   var OST = { requested: 'Запрос', paid: 'Оплачен', completed: 'Завершена', cancelled: 'Отменена' };
-  EVSA.labels = { OST: OST };
+  var WST = { pending: 'В ожидании', completed: 'Завершён', rejected: 'Отклонён' };
+  var WD_ICO = '<svg viewBox="0 0 24 24"><path d="M12 19V6M6 11l6-6 6 6M5 21h14"/></svg>';
+  EVSA.labels = { OST: OST, WST: WST };
 
   /* ================= ПРОФИЛЬ ================= */
   var PL_ICO = {
@@ -13,7 +15,8 @@
   P.profile = function (el, tab) {
     var me = db.me();
     if (!me) return P.needLogin(el, 'Профиль');
-    var tabs = [['items', 'Мои товары'], ['reviews', 'Отзывы'], ['buys', 'Покупки'], ['sells', 'Продажи'], ['topups', 'Пополнения']];
+    var pw = db.pendingWithdrawal();
+    var tabs = [['items', 'Мои товары'], ['reviews', 'Отзывы'], ['buys', 'Покупки'], ['sells', 'Продажи'], ['topups', 'Пополнения'], ['withdrawals', 'История выводов']];
     if (!tabs.some(function (x) { return x[0] === tab; })) tab = 'items';
     var st = db.sellerStats(me.id), banned = db.isBanned(me);
     var body = '';
@@ -31,16 +34,24 @@
       body = tp.length ? '<div class="card">' + tp.map(function (t) { return '<div class="list-row"><div class="grow"><b class="small">Пополнение звёздами</b><div class="tiny muted">' + U.dt(t.paidAt || t.createdAt) + ' · ' + t.stars + ' ⭐</div></div><span class="status completed">Зачислено</span><b class="small nowrap">+' + U.rub(t.rub) + '</b></div>'; }).join('') + '</div>' :
         U.empty('Пополнений пока нет', 'Пополните баланс звёздами Telegram — кнопка «Пополнить» выше');
     }
+    if (tab === 'withdrawals') {
+      var wl = db.withdrawals();
+      body = wl.length ? '<div class="card">' + wl.map(function (w) { return '<div class="list-row wd-row"><div class="grow"><b class="small">Вывод в Telegram</b><div class="tiny muted">' + U.dt(w.createdAt) + ' · ≈' + EVSA.topupStars(w.rub) + ' ⭐' + (w.processedAt ? ' · ' + (w.status === 'rejected' ? 'отклонён ' : 'завершён ') + U.dt(w.processedAt) : '') + '</div></div><span class="status ' + w.status + '">' + (WST[w.status] || w.status) + '</span><b class="small nowrap"' + (w.status === 'rejected' ? ' title="Возвращено на баланс">↩ ' : '>−') + U.rub(w.rub) + '</b></div>'; }).join('') + '</div>' +
+        '<div class="tiny muted" style="margin-top:8px">Выводы обрабатываются вручную: подарок за звёзды приходит в Telegram на ваш аккаунт @' + esc(me.username || '…') + '. При отклонении сумма возвращается на баланс.</div>' :
+        U.empty('Выводов пока нет', 'Нажмите «Вывести» рядом с балансом, чтобы получить подарок за звёзды в Telegram');
+    }
     if (tab === 'reviews') { var rv = db.reviewsFor(me.id); body = rv.length ? '<div class="card">' + rv.map(P.reviewHtml).join('') + '</div>' : U.empty('Отзывов пока нет', 'Отзывы оставляют покупатели после завершённой сделки'); }
     el.innerHTML = '<div class="page" style="max-width:860px"><div class="card prof-card">' + (banned ? '<div class="note bad" style="margin-bottom:14px">Аккаунт заблокирован. Покупки, продажи и чаты недоступны. Вы можете написать в поддержку.</div>' : '') +
       '<div class="prof-top"><label class="ava-edit" title="Обновить аватарку">' + U.avatar(me, 'xl') + '<span class="ava-cam">' + I.plus + '</span><input type="file" accept="image/jpeg,image/png,image/webp" id="avaFile" hidden></label><div class="grow" style="min-width:0"><h1 class="clip">' + esc(me.name) + '</h1>' +
       '<div class="muted">' + (me.username ? '@' + esc(me.username) : 'username не указан') + '</div>' + (me.tgId ? '<div class="tiny muted">Telegram ID: ' + esc(me.tgId) + '</div>' : '') +
       '<div style="margin-top:6px">' + U.stars(st.rating) + ' · ' + st.count + ' ' + EVSA.plural(st.count, 'отзыв', 'отзыва', 'отзывов') + '</div></div></div>' +
       '<div class="balance-box"><div class="grow" style="min-width:0"><div class="muted small">Баланс</div><b>' + (db.unlimited() ? '<span title="Безлимитный баланс">∞</span>' : U.rub(db.balance())) + '</b></div>' +
-      (banned ? '' : '<button class="btn primary" data-act="deposit">' + I.plus + 'Пополнить</button>') + '</div>' +
+      (banned ? '' : '<div class="bal-actions">' + (db.unlimited() ? '' : '<button class="btn wd-btn" data-act="withdraw">' + WD_ICO + 'Вывести</button>') + '<button class="btn primary" data-act="deposit">' + I.plus + 'Пополнить</button></div>') + '</div>' +
+      (pw ? '<div class="note wd-pending" data-href="#/profile/withdrawals"><span class="status pending">В ожидании</span> Вывод ' + U.rub(pw.rub) + ' (≈' + EVSA.topupStars(pw.rub) + ' ⭐) обрабатывается — подарок придёт в Telegram</div>' : '') +
       '<div class="prof-actions"><button class="btn cyan" data-href="#/sell">' + I.plus + 'Продать</button><button class="btn" data-href="#/chats">' + PL_ICO.chat + 'Чаты</button><button class="btn" data-href="#/favorites">' + PL_ICO.heart + 'Избранное</button></div>' +
       '<div class="tabs">' + tabs.map(function (x) { return '<button class="tab' + (x[0] === tab ? ' active' : '') + '" data-href="#/profile/' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div><div class="tab-body">' + body + '</div>' +
       '<div class="row wrap prof-foot"><button class="btn sm" data-act="login">' + I.tg + 'Обновить данные из Telegram</button><button class="btn sm danger" data-act="logout">Выйти</button></div></div></div>';
+    var tabAct = U.$('.tabs .tab.active', el); if (tabAct && tabAct.offsetLeft > tabAct.parentNode.clientWidth - tabAct.offsetWidth) tabAct.parentNode.scrollLeft = tabAct.offsetLeft - 16;
     var f = U.$('#avaFile', el);
     f.onchange = function () { U.readImage(f.files[0], 256, function (e, url) { if (e) return U.err(e); U.toast('Загружаем аватарку…'); U.try(function () { return db.updateAvatar(url).then(function () { U.toast('Аватарка обновлена', 'ok'); EVSA.sound.success(); }); }); }); };
   };

@@ -376,3 +376,10 @@ h1{color:#ffe9d2}
   [data-theme=light] .hw-web{opacity:.35}
   [data-theme=light] .hw-moon{opacity:.6}
 }
+/* вывод средств */
+.wd-btn{border-color:rgba(255,122,0,.55);color:#ffb347;background:rgba(255,122,0,.08)}
+.wd-btn:hover{background:rgba(255,122,0,.16)}
+.wd-pending{border-color:rgba(245,158,11,.45)}
+[data-theme=light] .wd-btn{border-color:rgba(232,106,0,.5);color:#b83200;background:#fff}
+[data-theme=light] .wd-btn:hover{background:#fff4e8}
+[data-theme=light] .wd-pending{background:#fffbeb;border-color:rgba(161,98,7,.35);color:#3b2a14}
