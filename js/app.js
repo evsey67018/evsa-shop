@@ -146,7 +146,7 @@
       case 'removeProduct': return confirmModal('Снять товар с продажи?', 'Объявление исчезнет из каталога.', 'Снять', function () { return db.deleteProduct(id).then(function () { U.toast('Товар снят с продажи', 'ok'); location.hash = '#/profile/items'; }); });
       case 'review': return reviewModal(id);
       case 'deposit': if (!need()) return; return depositModal();
-      case 'withdraw': if (!need()) return; return withdrawModal();
+      case 'withdraw': if (!need()) return; if (db.unlimited && db.unlimited()) { U.toast('У тебя безлимитный баланс ∞ (владелец), вывод нужен только обычным пользователям. Их заявки приходят тебе в бот.'); return; } return withdrawModal();
     }
   }
 
