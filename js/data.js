@@ -70,6 +70,8 @@ EVSA.CAT_DEFS = {
   privileges:{ name:'Привилегии на серверах', desc:'Донат и ранги на серверах', del:'По ID игрока',        icon:EVSA._svg('<rect x="3" y="3" width="18" height="7" rx="1.5"/><rect x="3" y="14" width="18" height="7" rx="1.5"/><path d="M7 6.5h.01M7 17.5h.01"/>') },
   promo:     { name:'Промоакции',        desc:'Промокоды и подарочные коды',    del:'Код / ключ',          icon:EVSA._svg('<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/>') },
   design:    { name:'Дизайн',            desc:'Аватарки, баннеры, превью',      del:'Файл',                icon:EVSA._svg('<path d="M12 19l7-7 3 3-7 7zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18zM2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/>') },
+  skins_mods:{ name:'Скины, моды, карты', desc:'Скины, ресурспаки, моды и сборки', del:'Файл',           icon:EVSA._svg('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>') },
+  decor:     { name:'Оформление',        desc:'Аватарки, баннеры, эмодзи',      del:'Файл',                icon:EVSA._svg('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>') },
   services:  { name:'Услуги',            desc:'Помощь, настройка, обучение',    del:'Услуга через чат',    icon:EVSA._svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/>') },
   other:     { name:'Другое',            desc:'Всё, что не подошло выше',       del:'Услуга через чат',    icon:EVSA._svg('<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>') }
 };
@@ -77,7 +79,7 @@ EVSA.CAT_DEFS = {
 EVSA.CATS = {
   /* ---- игры ---- */
   minecraft:   [['donate','Майнкоины','Minecoins для Marketplace'], ['accounts','Аккаунты','Лицензия Java / Bedrock'], ['keys','Ключи и лицензии','Коды активации Minecraft'],
-                ['privileges','Донат на серверах','Привилегии, ранги, валюта серверов'], ['design','Скины, моды, карты','Скины, ресурспаки и сборки'], ['services','Постройки и услуги','Строительство, настройка серверов']],
+                ['privileges','Донат на серверах','Привилегии, ранги, валюта серверов'], ['skins_mods','Скины, моды, карты','Скины, ресурспаки и сборки'], ['services','Постройки и услуги','Строительство, настройка серверов']],
   roblox:      [['donate','Робуксы','Robux на ваш аккаунт','Вход в аккаунт'], ['limiteds','Лимитки и предметы','Лимитки и UGC из каталога'], ['items','Предметы в режимах','Adopt Me, Blox Fruits, MM2, Pet Sim и др.'],
                 'accounts', ['premium','Roblox Premium','Подписка Premium','Вход в аккаунт'], ['boost','Прокачка в режимах','Уровни, фарм, прохождение'], ['keys','Подарочные карты','Коды Roblox Gift Card']],
   brawlstars:  [['donate','Гемы','Гемы по Supercell ID','Вход в аккаунт'], ['pass','Brawl Pass','Brawl Pass и Brawl Pass Plus','Вход в аккаунт'], 'accounts',
@@ -111,14 +113,14 @@ EVSA.CATS = {
   telegram:    [['stars','Звёзды','Telegram Stars по юзернейму'], ['premium','Telegram Premium','Подписка Premium на 3–12 мес.','Подарком'], ['gifts','Подарки и NFT','Подарки и коллекционные NFT','Подарком'],
                 ['usernames','Юзернеймы и номера','@username и анонимные номера'], ['channels','Каналы и группы','Готовые каналы, чаты и боты'], 'accounts'],
   steam:       [['topup','Пополнение','Пополнение кошелька Steam','По юзернейму'], ['keys','Ключи игр','Ключи активации игр'], 'accounts', ['gifts','Гифты','Игры подарком на аккаунт'], ['items','Предметы и карточки','Карточки, фоны, предметы инвентаря']],
-  discord:     [['subs','Nitro','Discord Nitro и Nitro Basic','Подарком'], ['boost','Буст сервера','Бусты сервера Discord','Услуга через чат'], 'accounts', ['design','Оформление','Аватарки, баннеры, эмодзи'], ['services','Боты и настройка','Настройка серверов и ботов']],
-  youtube:     [['subs','YouTube Premium','Подписка Premium / Music'], ['accounts','Каналы','Готовые каналы и аккаунты'], ['design','Оформление','Превью, шапки, аватарки']],
+  discord:     [['subs','Nitro','Discord Nitro и Nitro Basic','Подарком'], ['boost','Буст сервера','Бусты сервера Discord','Услуга через чат'], 'accounts', ['decor','Оформление','Аватарки, баннеры, эмодзи'], ['services','Боты и настройка','Настройка серверов и ботов']],
+  youtube:     [['subs','YouTube Premium','Подписка Premium / Music'], ['accounts','Каналы','Готовые каналы и аккаунты'], ['decor','Оформление','Превью, шапки, аватарки']],
   spotify:     [['subs','Spotify Premium','Индивидуальная, Duo, Family'], 'accounts', ['keys','Подарочные карты','Коды Spotify Premium']],
   psstore:     [['topup','Пополнение и карты','Карты пополнения PSN'], ['subs','PS Plus','Essential, Extra, Deluxe'], ['keys','Игры','Игры и DLC на аккаунт','Вход в аккаунт'], 'accounts'],
   xbox:        [['subs','Game Pass','Game Pass Ultimate / PC / Core'], ['keys','Игры и ключи','Ключи игр Xbox / PC'], ['topup','Карты пополнения','Подарочные карты Xbox'], 'accounts'],
   epic:        [['keys','Ключи игр','Игры и DLC'], ['accounts','Аккаунты','Аккаунты с играми'], ['topup','Пополнение','Подарочные карты Epic Games']],
   chatgpt:     [['subs','ChatGPT Plus / Pro','Подписка на ваш аккаунт'], ['accounts','Аккаунты','Готовые аккаунты с подпиской'], ['keys','Доступ к API','API-ключи и баланс'], ['services','Помощь и промпты','Настройка, промпты, GPTs']],
-  twitch:      [['subs','Подписки и Turbo','Подписки на каналы, Twitch Turbo','Подарком'], ['donate','Bits','Bits на аккаунт','Вход в аккаунт'], ['accounts','Каналы','Каналы и аккаунты'], ['design','Оформление','Оверлеи, панели, эмоуты']],
+  twitch:      [['subs','Подписки и Turbo','Подписки на каналы, Twitch Turbo','Подарком'], ['donate','Bits','Bits на аккаунт','Вход в аккаунт'], ['accounts','Каналы','Каналы и аккаунты'], ['decor','Оформление','Оверлеи, панели, эмоуты']],
   netflix:     [['subs','Подписка','Подписка Netflix'], ['accounts','Аккаунты и профили','Аккаунты и места в профиле'], ['keys','Подарочные карты','Gift Card Netflix']],
   nintendo:    [['topup','Карты пополнения','Пополнение eShop'], ['subs','Nintendo Switch Online','Подписка NSO и Expansion Pack'], ['keys','Игры и ключи','Коды игр и DLC'], 'accounts'],
   vk:          [['subs','Подписка','VK Музыка / VK Combo'], 'accounts', ['promo','Промокоды','Коды на подписку']],
