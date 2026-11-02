@@ -423,3 +423,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.create-stars-invoice]
 verify_jwt = false
+[functions.telegram-bot]
+verify_jwt = false
+static_files = ["./functions/telegram-bot/assets/*"]
