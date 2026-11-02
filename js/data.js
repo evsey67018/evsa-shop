@@ -49,7 +49,7 @@ EVSA.SITES = [
 /* ---------- Категории ----------
    CAT_DEFS — справочник всех видов товаров (id хранится в products.category, БД принимает ^[a-z0-9_-]{1,30}$).
    У каждой игры / сайта свой набор: EVSA.CATS[id] — список 'id' или ['id', 'Название', 'Описание', 'Способ получения'].
-   «Другое» всегда добавляется последним. Старые id (accounts, boost, donate, promo, design, other) сохранены. */
+   «Дизайн» (если его нет в списке) и «Другое» добавляются в конец автоматически. Старые id (accounts, boost, donate, promo, design, other) сохранены. */
 EVSA._svg = function (b) { return '<svg viewBox="0 0 24 24">' + b + '</svg>'; };
 EVSA.CAT_DEFS = {
   donate:    { name:'Донат',             desc:'Валюта и пополнения',            del:'По ID игрока',        icon:EVSA._svg('<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2-1.4 0-2.6-.6-3-1.6M12 6v2M12 18v-2"/>') },
@@ -163,6 +163,8 @@ EVSA.catsFor = function (t) {
     if (!d || seen[a[0]]) return null; seen[a[0]] = 1;
     return { id: a[0], name: a[1] || d.name, desc: a[2] || d.desc, icon: d.icon, del: a[3] || d.del };
   }).filter(Boolean).filter(function (c) { return c.id !== 'other'; });
+  /* «Дизайн» (аватарки, баннеры, превью) есть у каждой игры и сайта — перед «Другое» */
+  if (!seen.design) { var dz = EVSA.CAT_DEFS.design; list.push({ id: 'design', name: dz.name, desc: dz.desc, icon: dz.icon, del: dz.del }); }
   list.push({ id: 'other', name: 'Другое', desc: 'Всё остальное по «' + t.name + '»', icon: EVSA.CAT_DEFS.other.icon, del: EVSA.CAT_DEFS.other.del });
   return (t._cats = list);
 };
