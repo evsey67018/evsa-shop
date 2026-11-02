@@ -63,7 +63,7 @@
     if (db.isBanned(me)) { el.innerHTML = '<div class="page"><div class="note bad">Заблокированные пользователи не могут продавать.</div></div>'; return; }
     if (!S || (q && q.t)) S = { step: q && q.t ? (q.c ? 3 : 2) : 1, type: (q && q.t) === 'site' ? 'site' : 'game', targetId: (q && q.id) || '', category: (q && q.c) || '', title: '', desc: '', buyerMsg: '', price: '', oldPrice: '', image: '', filter: '', delivery: '' };
     if (S.step >= 2 && !EVSA.findTarget(S.type, S.targetId)) S.step = 1;
-    if (S.step >= 3 && !EVSA.CATEGORIES.some(function (c) { return c.id === S.category; })) S.step = 2;
+    if (S.step >= 3 && !EVSA.catFor(EVSA.findTarget(S.type, S.targetId), S.category, true)) S.step = 2;
     draw();
     function draw() {
       var names = ['Игра или сайт', 'Категория', 'Описание и цена'];
@@ -75,15 +75,15 @@
           (list.length ? '<div class="pick-grid">' + list.map(function (t) { return '<div class="pick' + (S.targetId === t.id ? ' active' : '') + '" data-pick="' + t.id + '" tabindex="0">' + U.cover(t) + '<div class="n">' + esc(t.name) + '</div></div>'; }).join('') + '</div>' : U.empty('Ничего не найдено', 'Попробуйте другое название')) + '</div>';
       } else if (S.step === 2) {
         var t = EVSA.findTarget(S.type, S.targetId);
-        html += '<div class="card"><h2 style="margin-bottom:4px">Категория</h2><div class="muted small" style="margin-bottom:14px">' + esc(t.name) + '</div><div class="cat-grid">' + EVSA.CATEGORIES.map(function (c) {
-          return '<div class="cat-card' + (S.category === c.id ? ' pick active' : '') + '" data-cat="' + c.id + '" tabindex="0"><div class="ci">' + c.icon + '</div><b>' + c.name + '</b><span>' + c.desc + '</span></div>'; }).join('') + '</div><button class="btn" data-step="1">' + I.back + 'Назад</button></div>';
+        html += '<div class="card"><h2 style="margin-bottom:4px">Категория</h2><div class="muted small" style="margin-bottom:14px">' + esc(t.name) + '</div><div class="cat-grid">' + EVSA.catsFor(t).map(function (c) {
+          return '<div class="cat-card' + (S.category === c.id ? ' pick active' : '') + '" data-cat="' + c.id + '" tabindex="0"><div class="ci">' + c.icon + '</div><b>' + esc(c.name) + '</b><span>' + esc(c.desc) + '</span></div>'; }).join('') + '</div><button class="btn" data-step="1">' + I.back + 'Назад</button></div>';
       } else {
         var tt = EVSA.findTarget(S.type, S.targetId);
-        html += '<div class="sell-layout"><div class="card stack sell-form"><div class="sell-target">' + U.miniIcon(tt) + '<span class="grow">' + esc(tt.name) + ' · ' + EVSA.catName(S.category) + '</span><button type="button" class="btn sm ghost" data-step="2">Изменить</button></div>' +
+        html += '<div class="sell-layout"><div class="card stack sell-form"><div class="sell-target">' + U.miniIcon(tt) + '<span class="grow">' + esc(tt.name) + ' · ' + esc(EVSA.catName(S.category, tt)) + '</span><button type="button" class="btn sm ghost" data-step="2">Изменить</button></div>' +
           '<label class="field">Название товара *<input class="input" id="fTitle" maxlength="80" value="' + esc(S.title) + '" placeholder="Например: Аккаунт с редкими скинами"><span class="hint"><span id="cTitle">' + S.title.length + '</span>/80</span></label>' +
           '<label class="field">Описание товара *<textarea class="input" id="fDesc" maxlength="2000" placeholder="Подробно опишите товар: что получит покупатель, как будет передан">' + esc(S.desc) + '</textarea><span class="hint">минимум 10 символов · <span id="cDesc">' + S.desc.length + '</span>/2000</span></label>' +
           '<label class="field">Сообщение покупателю после покупки <em>необязательно</em><textarea class="input" id="fMsg" maxlength="1000" style="min-height:70px" placeholder="Например: Спасибо! Напишите свой ID в чат">' + esc(S.buyerMsg) + '</textarea></label>' +
-          '<label class="field">Способ получения<select class="select" id="fDel">' + EVSA.DELIVERY.map(function (d) { return '<option' + ((S.delivery || EVSA.DELIVERY_BY_CAT[S.category]) === d ? ' selected' : '') + '>' + d + '</option>'; }).join('') + '</select></label>' +
+          '<label class="field">Способ получения<select class="select" id="fDel">' + EVSA.DELIVERY.map(function (d) { return '<option' + ((S.delivery || EVSA.catDelivery(S.category, tt)) === d ? ' selected' : '') + '>' + d + '</option>'; }).join('') + '</select></label>' +
           '<div class="price-row"><label class="field">Цена, ₽ *<input class="input" id="fPrice" type="number" inputmode="decimal" min="1" max="1000000" step="1" value="' + esc(S.price) + '" placeholder="Например, 500"></label><label class="field">Цена без скидки, ₽ <em>необязательно</em><input class="input" id="fOld" type="number" inputmode="decimal" min="0" max="1000000" step="1" value="' + esc(S.oldPrice) + '" placeholder="0"></label></div>' +
           '<div class="small hint" id="feeInfo"></div><div class="small hint" id="discInfo">Заполните «Цену без скидки», только если она больше цены — тогда покажем скидку.</div>' +
           '<div class="field">Фотография товара *<label class="upload' + (S.image ? ' has-img' : '') + '" id="upl" tabindex="0">' + (S.image ? '<img src="' + S.image + '" alt=""><span class="upl-change">Заменить фото</span>' : '<div class="upl-plus">＋</div>Нажмите, чтобы загрузить фото<br><span class="tiny">JPG, PNG, WEBP · до 8 МБ</span>') + '<input type="file" id="fImg" accept="image/jpeg,image/png,image/webp" hidden></label></div>' +
@@ -119,7 +119,7 @@
       var pb = U.$('#publish', el); if (pb) pb.onclick = function () {
         var errBox = U.$('#fErr', el);
         var v = validate(); if (v) { errBox.textContent = v[1]; var f = v[0] && U.$('#' + v[0], el); if (f) { f.classList.add('bad'); f.focus(); } EVSA.sound.error(); return; } errBox.textContent = '';
-        var data = { targetType: S.type, targetId: S.targetId, category: S.category, title: S.title, desc: S.desc, buyerMsg: S.buyerMsg, price: num(S.price), oldPrice: num(S.oldPrice) > num(S.price) ? num(S.oldPrice) : 0, image: S.image, delivery: S.delivery || EVSA.DELIVERY_BY_CAT[S.category] };
+        var data = { targetType: S.type, targetId: S.targetId, category: S.category, title: S.title, desc: S.desc, buyerMsg: S.buyerMsg, price: num(S.price), oldPrice: num(S.oldPrice) > num(S.price) ? num(S.oldPrice) : 0, image: S.image, delivery: S.delivery || EVSA.catDelivery(S.category, EVSA.findTarget(S.type, S.targetId)) };
         pb.textContent = 'Публикуем…';
         U.busy(pb, db.createProduct(data)).then(function (p) { S = null; EVSA.sound.success(); U.toast('Товар выставлен! Его уже видят покупатели', 'ok'); location.hash = '#/p/' + p.id; })
           .catch(function (e) { pb.textContent = 'Выставить товар'; errBox.textContent = e.userMessage || 'Не удалось выставить товар'; EVSA.sound.error(); });

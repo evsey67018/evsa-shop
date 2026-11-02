@@ -94,22 +94,24 @@
   };
 
   /* ================= СТРАНИЦА ИГРЫ / САЙТА ================= */
-  function catLabel(t, c) { return c.id === 'donate' && t.cur && t.cur !== 'скины' ? t.cur : c.name; }
+  /* категории этой игры / сайта; если открыта старая категория, которой нет в списке, — показываем её тоже */
+  function catsOf(t, cat) { var l = EVSA.catsFor(t).slice(), x = cat && !l.some(function (c) { return c.id === cat; }) && EVSA.catFor(t, cat); if (x) l.splice(l.length - 1, 0, x); return l; }
   P.target = function (el, type, id, cat) {
     var t = EVSA.findTarget(type, id);
     if (!t) { el.innerHTML = '<div class="page">' + U.empty('Не найдено', 'Такой игры или сайта нет', '<br><button class="btn" data-href="#/">На главную</button>') + '</div>'; return; }
     var st = P._listState = P._listState && P._listState.key === type + id + cat ? P._listState : { key: type + id + cat, search: '', sort: 'popular', online: false, discountOnly: false, withReviews: false, delivery: '', minPrice: '', maxPrice: '' };
+    var cats = catsOf(t, cat), curCat = cat && cats.filter(function (c) { return c.id === cat; })[0];
     var chips = '<div class="chips">' + '<button class="chip' + (!cat ? ' active' : '') + '" data-href="#/t/' + type + '/' + id + '">Все<span class="cnt">' + db.countFor(type, id) + '</span></button>' +
-      EVSA.CATEGORIES.map(function (c) { return '<button class="chip' + (cat === c.id ? ' active' : '') + '" data-href="#/t/' + type + '/' + id + '/' + c.id + '">' + esc(catLabel(t, c)) + '<span class="cnt">' + db.countFor(type, id, c.id) + '</span></button>'; }).join('') + '</div>';
+      cats.map(function (c) { return '<button class="chip' + (cat === c.id ? ' active' : '') + '" data-href="#/t/' + type + '/' + id + '/' + c.id + '">' + esc(c.name) + '<span class="cnt">' + db.countFor(type, id, c.id) + '</span></button>'; }).join('') + '</div>';
     var html = '<div class="page"><div class="ghead"><div class="bgglow" style="background:linear-gradient(90deg,' + t.c1 + ',' + t.c2 + ')"></div>' + U.cover(t) +
       '<div style="position:relative"><div class="muted small">' + (type === 'site' ? 'Сайт / приложение' : 'Игра') + ' · ' + esc(t.tag) + '</div><h1>' + esc(t.name) + '</h1><div class="muted small">' + (db.countFor(type, id) ? EVSA.offersText(db.countFor(type, id)) + ' от продавцов' : 'Пока нет товаров — стань первым продавцом') + '</div></div></div>' +
       '<div class="sticky-bar"><button class="icon-btn" data-act="back" aria-label="Назад">' + I.left + '</button>' + chips + '</div>';
     if (!cat) {
-      html += '<div class="cat-grid" style="margin-top:6px">' + EVSA.CATEGORIES.map(function (c) {
-        return '<div class="cat-card" data-href="#/t/' + type + '/' + id + '/' + c.id + '"><div class="ci">' + c.icon + '</div><b>' + esc(catLabel(t, c)) + '</b><span>' + c.desc + ' · ' + db.countFor(type, id, c.id) + '</span></div>';
+      html += '<div class="cat-grid" style="margin-top:6px">' + cats.map(function (c) {
+        return '<div class="cat-card" data-href="#/t/' + type + '/' + id + '/' + c.id + '"><div class="ci">' + c.icon + '</div><b>' + esc(c.name) + '</b><span>' + esc(c.desc) + ' · ' + db.countFor(type, id, c.id) + '</span></div>';
       }).join('') + '</div><h2 style="margin:4px 0 0">Все предложения</h2>';
     }
-    html += '<div class="filters"><input class="input" id="catSearch" type="search" placeholder="Поиск по товарам' + (cat ? ' в «' + esc(catLabel(t, EVSA.CATEGORIES.filter(function (c) { return c.id === cat; })[0] || { name: '' })) + '»' : '') + '" value="' + esc(st.search) + '">' +
+    html += '<div class="filters"><input class="input" id="catSearch" type="search" placeholder="Поиск по товарам' + (curCat ? ' в «' + esc(curCat.name) + '»' : '') + '" value="' + esc(st.search) + '">' +
       '<button class="fchip' + (st.online ? ' on' : '') + '" data-f="online"><span class="online-dot"></span>Продавец онлайн</button>' +
       '<label class="fchip">Способ получения <select id="fDelivery"><option value="">Любой</option>' + EVSA.DELIVERY.map(function (d) { return '<option>' + d + '</option>'; }).join('') + '</select></label>' +
       '<label class="fchip">Цена <input id="fMin" type="number" inputmode="numeric" min="0" placeholder="от" value="' + esc(st.minPrice) + '">–<input id="fMax" type="number" inputmode="numeric" min="0" placeholder="до" value="' + esc(st.maxPrice) + '"></label>' +
@@ -145,14 +147,14 @@
     var other = db.products({ sellerId: s.id, sort: 'popular' }).filter(function (x) { return x.id !== p.id; }).slice(0, 4);
     var similar = db.products({ targetType: p.targetType, targetId: p.targetId, category: p.category, sort: 'popular' }).filter(function (x) { return x.id !== p.id && x.sellerId !== s.id; }).slice(0, 8);
     var guarantee = '<div class="guar"><i>' + I.check + '</i>С оплатой на сайте — возврат, если товар не получен</div><div class="guar"><i>' + I.check + '</i>…и если товар не соответствует описанию</div>';
-    el.innerHTML = '<div class="page"><div class="row small muted" style="margin-bottom:14px;flex-wrap:wrap;gap:8px"><button class="icon-btn" data-act="back" aria-label="Назад">' + I.left + '</button>' + U.miniIcon(t) + '<a href="#/t/' + p.targetType + '/' + t.id + '">' + esc(t.name) + '</a><a class="pill" href="#/t/' + p.targetType + '/' + t.id + '/' + p.category + '">' + EVSA.catName(p.category) + '</a></div>' +
+    el.innerHTML = '<div class="page"><div class="row small muted" style="margin-bottom:14px;flex-wrap:wrap;gap:8px"><button class="icon-btn" data-act="back" aria-label="Назад">' + I.left + '</button>' + U.miniIcon(t) + '<a href="#/t/' + p.targetType + '/' + t.id + '">' + esc(t.name) + '</a><a class="pill" href="#/t/' + p.targetType + '/' + t.id + '/' + p.category + '">' + esc(EVSA.catName(p.category, t)) + '</a></div>' +
       '<div class="pp"><div><div class="pp-img">' + U.imgTag(p) + (p.premium ? '<span class="badge-prem">★ PREMIUM</span>' : '') +
       '<button class="fav-big' + (fav ? ' on' : '') + '" data-act="fav" data-id="' + p.id + '">' + I.heart + '<span>' + (fav ? 'В избранном' : 'В избранное') + '</span></button></div>' +
       '<div class="card" style="margin-top:14px"><h3 style="margin-bottom:8px">Описание</h3><div class="desc">' + esc(p.desc) + '</div>' +
       (mine ? '' : '<button class="link-btn" style="margin-top:12px" data-act="report" data-id="' + p.id + '">' + I.flag + 'Пожаловаться</button>') + '</div></div>' +
       '<div><div class="card"><h1 style="font-size:22px;margin-bottom:6px">' + esc(p.title) + '</h1>' +
       '<div class="small muted">' + (st.count ? '<span class="stars">' + st.rating.toFixed(1) + ' ★</span> ' + st.count + ' ' + EVSA.plural(st.count, 'отзыв', 'отзыва', 'отзывов') : 'Пока нет отзывов') + ' · продано ' + p.sales + '</div>' +
-      '<h3 style="margin:16px 0 4px">Характеристики</h3><div class="chars"><div><span>Игра / сервис</span>' + esc(t.name) + '</div><div><span>Тип</span>' + EVSA.catName(p.category) + '</div><div><span>Способ получения</span>' + esc(p.delivery || EVSA.DELIVERY_BY_CAT[p.category]) + '</div>' + (p.qty > 1 ? '<div><span>В наличии</span>' + p.qty + ' шт.</div>' : '') + '</div>' +
+      '<h3 style="margin:16px 0 4px">Характеристики</h3><div class="chars"><div><span>Игра / сервис</span>' + esc(t.name) + '</div><div><span>Тип</span>' + esc(EVSA.catName(p.category, t)) + '</div><div><span>Способ получения</span>' + esc(p.delivery || EVSA.catDelivery(p.category, t)) + '</div>' + (p.qty > 1 ? '<div><span>В наличии</span>' + p.qty + ' шт.</div>' : '') + '</div>' +
       guarantee +
       '<div class="pp-price price" style="margin:16px 0 4px"><b' + (d ? ' class="red"' : '') + '>' + U.rub(p.price) + '</b>' + (d ? '<span class="disc-pill">−' + d + '%</span><s>' + U.rub(p.oldPrice) + '</s>' : '') + '</div>' +
       '<div class="tiny muted" style="margin-bottom:14px">Опубликовано ' + U.date(p.createdAt) + (p.status === 'sold' ? ' · <b style="color:#f87171">Продан</b>' : '') + '</div>' +

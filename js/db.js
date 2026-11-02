@@ -335,8 +335,8 @@
     createProduct: function (f) {
       return once('create', function () {
         requireActive();
-        if (!EVSA.findTarget(f.targetType, f.targetId)) fail('Выберите игру или сайт');
-        if (!EVSA.CATEGORIES.some(function (c) { return c.id === f.category; })) fail('Выберите категорию');
+        var tgt = EVSA.findTarget(f.targetType, f.targetId); if (!tgt) fail('Выберите игру или сайт');
+        if (!EVSA.catFor(tgt, f.category, true)) fail('Выберите категорию');
         var title = String(f.title || '').trim(), desc = String(f.desc || '').trim();
         if (title.length < 4 || title.length > 80) fail('Название: от 4 до 80 символов');
         if (desc.length < 10 || desc.length > 2000) fail('Описание: от 10 до 2000 символов');
@@ -350,7 +350,7 @@
         return uploadImage(f.image).then(function (url) {
           return sb.from('products').insert({ id: id, seller_id: uidMe, target_type: f.targetType, target_id: f.targetId, category: f.category, title: title, description: desc,
             buyer_msg: String(f.buyerMsg || '').trim().slice(0, 1000), price: price, old_price: old, images: [url],
-            delivery: EVSA.DELIVERY.indexOf(f.delivery) >= 0 ? f.delivery : EVSA.DELIVERY_BY_CAT[f.category] }).select().single();
+            delivery: EVSA.DELIVERY.indexOf(f.delivery) >= 0 ? f.delivery : EVSA.catDelivery(f.category, tgt) }).select().single();
         }).then(function (r) { var p = upsert(C.products, mapProduct(q(r, 'Не удалось выставить товар'))); emit(true); return p; });
       });
     },

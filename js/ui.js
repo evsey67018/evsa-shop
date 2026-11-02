@@ -50,7 +50,7 @@
   /* Обложка товара: загруженное фото или аккуратная сгенерированная заглушка */
   U.productArt = function (p) {
     var t = EVSA.findTarget(p.targetType, p.targetId) || { c1: '#444', c2: '#111', short: '?' };
-    var cat = EVSA.catName(p.category);
+    var cat = EVSA.catName(p.category, EVSA.findTarget(p.targetType, p.targetId));
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + t.c1 + '"/><stop offset="1" stop-color="' + t.c2 + '"/></linearGradient>' +
       '<radialGradient id="r" cx=".8" cy=".1" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>' +
       '<rect width="320" height="200" fill="url(#g)"/><rect width="320" height="200" fill="url(#r)"/>' +
@@ -97,7 +97,7 @@
     return '<article class="pcard' + (p.premium ? ' premium' : '') + '" data-href="#/p/' + p.id + '" style="animation-delay:' + Math.min(i || 0, 12) * 35 + 'ms">' +
       '<div class="pimg">' + U.imgTag(p) + (p.premium ? '<span class="badge-prem">★ PREMIUM</span>' : '') +
       (p.id !== 'preview' ? '<button class="fav-btn' + (fav ? ' on' : '') + '" data-act="fav" data-id="' + p.id + '" aria-label="В избранное">♥</button>' : '') + '</div>' +
-      '<div class="pbody"><div class="pmeta">' + U.miniIcon(t) + '<span class="pgame">' + U.esc(t.name) + '</span><span class="pill">' + U.esc(EVSA.catName(p.category)) + '</span></div>' +
+      '<div class="pbody"><div class="pmeta">' + U.miniIcon(t) + '<span class="pgame">' + U.esc(t.name) + '</span><span class="pill">' + U.esc(EVSA.catName(p.category, t)) + '</span></div>' +
       '<div class="ptitle">' + U.esc(p.title) + '</div>' +
       '<div class="prate">' + (st.count ? '<span class="stars">' + st.rating.toFixed(1) + ' ★</span> ' + st.count + ' отзывов' : 'Новый продавец') + '</div>' +
       '<div class="price"><b' + (d ? ' class="red"' : '') + '>' + U.rub(p.price) + '</b>' + (d ? '<span class="disc-pill">−' + d + '%</span><s>' + U.rub(p.oldPrice) + '</s>' : '') + '</div>' +
