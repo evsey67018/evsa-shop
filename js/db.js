@@ -74,7 +74,7 @@
     return { id: r.id, a: r.buyer_id, b: r.seller_id, buyerId: r.buyer_id, sellerId: r.seller_id, productId: r.product_id, orderId: null, lastAt: ts(r.last_message_at), readAt: read, unread: {} };
   }
   function mapMsg(r) { return { id: r.id, chatId: r.chat_id, from: r.sender_id, text: r.text, system: false, createdAt: ts(r.created_at) }; }
-  function mapOrder(r) { return { id: r.id, productId: r.product_id, buyerId: r.buyer_id, sellerId: r.seller_id, chatId: r.chat_id, title: r.title, price: Number(r.price), status: r.status, createdAt: ts(r.created_at), paidAt: ts(r.paid_at), completedAt: ts(r.completed_at) }; }
+  function mapOrder(r) { return { id: r.id, productId: r.product_id, buyerId: r.buyer_id, sellerId: r.seller_id, chatId: r.chat_id, title: r.title, price: Number(r.price), status: r.status, createdAt: ts(r.created_at), paidAt: ts(r.paid_at), completedAt: ts(r.completed_at), sellerAmount: r.seller_amount == null ? null : Number(r.seller_amount), commissionAmount: r.commission_amount == null ? null : Number(r.commission_amount) }; }
   function mapReview(r) { return { id: r.id, orderId: r.order_id, productId: r.product_id, sellerId: r.seller_id, buyerId: r.buyer_id, rating: r.rating, text: r.text, createdAt: ts(r.created_at) }; }
 
   function computeUnread() {
@@ -125,8 +125,10 @@
       sb.from('messages').select('*').order('created_at', { ascending: true }).limit(5000),
       sb.from('orders').select('*').order('created_at', { ascending: false }).limit(500),
       sb.from('user_settings').select('*').maybeSingle(),
-      sb.rpc('my_telegram_id')
+      sb.rpc('my_telegram_id'),
+      sb.rpc('commission_rate')
     ]).then(function (rs) {
+      if (rs[6] && !rs[6].error && rs[6].data != null && isFinite(Number(rs[6].data))) EVSA.COMMISSION = Number(rs[6].data);
       if (me !== uidMe) return;
       C.favs = q(rs[0]).map(function (r) { return r.product_id; });
       C.chats = q(rs[1]).map(mapChat); C.messages = q(rs[2]).map(mapMsg); C.orders = q(rs[3]).map(mapOrder);

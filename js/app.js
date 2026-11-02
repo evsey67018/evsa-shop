@@ -151,7 +151,7 @@
       case 'report': if (!need()) return; return reportModal(id);
       case 'buy': if (!need()) return; return buyModal(id);
       case 'buyCart': return U.toast('Оплачивайте товары по одному — кнопка «Купить» у каждого товара');
-      case 'confirmOrder': return confirmModal('Подтвердить получение?', 'Подтверждайте, только если продавец передал товар и всё работает. После подтверждения сделка завершится и можно оставить отзыв.', 'Товар получен', function () { return db.confirmOrder(id).then(function () { EVSA.sound.success(); U.toast('Сделка завершена — оставьте отзыв продавцу', 'ok'); }); });
+      case 'confirmOrder': return confirmModal('Подтвердить получение?', 'Подтверждайте, только если продавец передал товар и всё работает. После подтверждения деньги перейдут продавцу, сделка завершится и можно оставить отзыв.', 'Товар получен', function () { return db.confirmOrder(id).then(function () { EVSA.sound.success(); U.toast('Сделка завершена — оставьте отзыв продавцу', 'ok'); }); });
       case 'cartAdd': if (!need()) return; return U.try(function () { db.cartAdd(id); EVSA.sound.success(); U.toast('Добавлено в корзину', 'ok', '#/cart'); });
       case 'cartRemove': return U.try(function () { db.cartRemove(id); render(true); });
       case 'chatSeller': if (!need()) return; return U.try(function () { return U.busy(el, db.openChat(id)).then(function (c) { if (c) location.hash = '#/chat/' + c.id; }); });

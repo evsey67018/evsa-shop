@@ -60,7 +60,12 @@ EVSA.TICKET_CATEGORIES = ['Жалоба на продавца','Жалоба н�
 /* Примерный курс Telegram Stars → ₽. В рабочей версии курс отдаёт сервер. */
 EVSA.STAR_RATE_RUB = 1.79;
 EVSA.PREMIUM_PRICE = 19;
-EVSA.WITHDRAW_MIN = 15;
+EVSA.WITHDRAW_MIN = 50;
+/* Комиссия площадки. Настоящая ставка хранится в БД (platform_settings.commission_rate) и подгружается в db.js. */
+EVSA.COMMISSION = 0.10;
+EVSA.commissionPct = function () { return Math.round(EVSA.COMMISSION * 10000) / 100; };
+/* Сколько получит продавец: цена − комиссия, округление вниз до копеек (как в order_confirm). */
+EVSA.sellerPayout = function (price) { return Math.floor(Math.round(Number(price || 0) * (1 - EVSA.COMMISSION) * 1e6) / 1e4) / 100; };
 EVSA.SUPPORT_TG = '@evssssa';
 
 EVSA.findTarget = function (type, id) {
